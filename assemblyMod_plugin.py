@@ -9,7 +9,7 @@ from abaqusGui import *
 ###########################################################################
 # Procedure definition
 ###########################################################################
-class flatnessProcedure(AFXProcedure):
+class instanceDeleteProcedure(AFXProcedure):
     "Class to start the planar query procedure"
 
     def __init__(self, owner):
@@ -40,13 +40,13 @@ class flatnessProcedure(AFXProcedure):
         return None
 
 ###########################################################################
-# Register the plugin
+# Register the plugins
 ###########################################################################
 toolset = getAFXApp().getAFXMainWindow().getPluginToolset()
 
 toolset.registerGuiMenuButton(
         buttonText='&Delete intances...', 
-        object=flatnessProcedure(toolset),
+        object=instanceDeleteProcedure(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=str(__version__),

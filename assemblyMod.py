@@ -17,6 +17,32 @@ def instance_delete(instances):
     vp.enableColorCodeUpdates()
     vp.enableRefresh()
 
+
+def instance_matchname():
+    " Called by Abaqus/CAE plugin to rename instances based on part names "
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+
+    parts = {}  # Identify unique parts and their instances
+    for inst in ra.instances.values():
+        parts.setdefault(inst.partName, []).append(inst.name)
+    print "%d unique parts in %d instances."%(len(parts), len(ra.instances))
+
+    newNames = {}   # Dict of new names to fix Loads, BCs, interations, etc.
+    for partName, instNames in parts.items():
+        if 1 == len(instNames):
+            instName = instNames[0]
+            toName = newNames.setdefault(instName, partName)    # no number necessary
+            ra.features.changeKey(fromName=instName, toName=toName)
+        else:
+            fmt = "%s-%%0%dd"%(partName, 1 + int(log10(len(instNames))))
+            for n, instName in enumerate(instNames):    # number each instance
+                toName = newNames.setdefault(instName, fmt%(n + 1))
+                ra.features.changeKey(fromName=instName, toName=toName)
+    # TODO: seek out and fix Loads, BCs, interactions, etc.
+
+
 def part_deleteUnused():
     " Called by Abaqus/CAE plugin to remove unused parts "
     from abaqus import session, mdb

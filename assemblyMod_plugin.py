@@ -2,7 +2,7 @@
 
 Carl Osterwisch <costerwi@gmail.com> November 2013
 """
-__version__ = 0.1
+__version__ = 0.2
 
 from abaqusGui import *
 
@@ -53,6 +53,15 @@ toolset.registerGuiMenuButton(
         applicableModules=['Assembly'],
         description='Graphically select instances to remove from the assembly.'
         )
+
+toolset.registerKernelMenuButton(
+        buttonText='Rename instances using part name', 
+        moduleName='assemblyMod',
+        functionName='instance_matchname()',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        applicableModules=['Assembly'],
+        description='Update instance names using part name as a base.')
 
 toolset.registerKernelMenuButton(
         buttonText='Delete &unused parts', 

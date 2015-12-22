@@ -60,3 +60,55 @@ def part_deleteUnused():
     for partName in unused:
         del model.parts[partName]
 
+
+def part_derefDuplicate():
+    " Replace repeated parts with one part "
+    from numpy import asarray, allclose
+    from abaqus import session
+    from abaqusConstants import MEDIUM
+
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+
+    similarMass = {}
+    for inst in ra.instances.values():
+        part = inst.part
+        if part.name in similarMass:
+            continue
+        massProp = part.getMassProperties(
+                relativeAccuracy=MEDIUM,
+                specifyDensity=True, density=1)
+        mass = massProp['mass']
+        if mass:
+            # Group parts by approximate mass
+            similarMass.setdefault(int(round(mass/5)), 
+                    {}).setdefault(part.name, (part, massProp))
+
+    vp.disableColorCodeUpdates()
+    count = 0
+    for similarParts in similarMass.values():
+        # Dict of parts with similar mass
+        while len(similarParts) > 1:
+            name, (masterPart, masterProp) = similarParts.popitem()
+            masterMoment = masterProp['momentOfInertia']
+            masterCentroid = asarray(masterProp['centerOfMass'])
+            unmatched = {}
+            for name, (slavePart, slaveProp) in similarParts.items():
+                slaveMoment = slaveProp['momentOfInertia']
+                if not allclose(slaveMoment, masterMoment, rtol=1e-1, atol=5):
+                    # TODO Check for rotated instances
+                    unmatched.setdefault( name, (slavePart, slaveProp) )
+                    continue
+                slaveCentroid = asarray(slaveProp['centerOfMass'])
+
+                # replace all instances of this slavePart
+                for inst in ra.instances.values():
+                    if not inst.part == slavePart:
+                        continue
+                    inst.replace(masterPart)
+                    inst.translate(slaveCentroid - masterCentroid
+                            + inst.getTranslation())
+                    count += 1
+            similarParts = unmatched
+    vp.enableColorCodeUpdates()
+    print("{} instances updated.".format(count))

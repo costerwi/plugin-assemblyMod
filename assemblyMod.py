@@ -9,7 +9,8 @@ def instance_delete(instances):
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
-    print "%d/%d instances selected for deletion."%(len(instances), len(ra.instances))
+    print("{}/{} instances selected for deletion.".format(
+        len(instances), len(ra.instances)))
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
     for i in instances:
@@ -20,6 +21,7 @@ def instance_delete(instances):
 
 def instance_matchname():
     " Called by Abaqus/CAE plugin to rename instances based on part names "
+    from math import log10
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
@@ -27,7 +29,8 @@ def instance_matchname():
     parts = {}  # Identify unique parts and their instances
     for inst in ra.instances.values():
         parts.setdefault(inst.partName, []).append(inst.name)
-    print "%d unique parts in %d instances."%(len(parts), len(ra.instances))
+    print("{} unique parts in {} instances.".format(
+        len(parts), len(ra.instances)))
 
     newNames = {}   # Dict of new names to fix Loads, BCs, interations, etc.
     for partName, instNames in parts.items():
@@ -52,7 +55,8 @@ def part_deleteUnused():
     parts = set(model.parts.keys())
     used = set([inst.partName for inst in ra.instances.values()])
     unused = parts - used
-    print "%d unused parts out of %d total to be deleted."%(len(unused), len(parts))
+    print("{} unused parts out of {} total to be deleted.".format(
+        len(unused), len(parts)))
     for partName in unused:
         del model.parts[partName]
 

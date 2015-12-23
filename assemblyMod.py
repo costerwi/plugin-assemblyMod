@@ -65,7 +65,7 @@ def part_derefDuplicate():
     " Replace repeated parts with one part "
     from numpy import asarray, allclose
     from abaqus import session
-    from abaqusConstants import MEDIUM
+    from abaqusConstants import HIGH
 
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
@@ -76,12 +76,12 @@ def part_derefDuplicate():
         if part.name in similarMass:
             continue
         massProp = part.getMassProperties(
-                relativeAccuracy=MEDIUM,
+                relativeAccuracy=HIGH,
                 specifyDensity=True, density=1)
         mass = massProp['mass']
         if mass:
             # Group parts by approximate mass
-            similarMass.setdefault(int(round(mass/5)), 
+            similarMass.setdefault(int(round(mass)),
                     {}).setdefault(part.name, (part, massProp))
 
     vp.disableColorCodeUpdates()
@@ -95,7 +95,8 @@ def part_derefDuplicate():
             unmatched = {}
             for name, (slavePart, slaveProp) in similarParts.items():
                 slaveMoment = slaveProp['momentOfInertia']
-                if not allclose(slaveMoment, masterMoment, rtol=1e-1, atol=5):
+                if not allclose(slaveMoment, masterMoment,
+                        atol=1e-6*max(abs(asarray(slaveMoment)))):
                     # TODO Check for rotated instances
                     unmatched.setdefault( name, (slavePart, slaveProp) )
                     continue

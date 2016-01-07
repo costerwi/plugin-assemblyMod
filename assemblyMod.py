@@ -19,6 +19,20 @@ def instance_delete(instances):
     vp.enableRefresh()
 
 
+def instance_delete_shell():
+    """Delete instances that have zero volume."""
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    remove = []
+    for inst in ra.instances.values():
+        if not inst.part.getVolume():
+            remove.append(inst)
+    for inst in remove:
+        del ra.instances[inst.name]
+    print("{} empty instances removed.".format(len(remove)))
+
+
 def instance_matchname():
     " Called by Abaqus/CAE plugin to rename instances based on part names "
     from math import log10

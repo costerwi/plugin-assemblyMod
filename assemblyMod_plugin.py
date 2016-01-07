@@ -81,3 +81,11 @@ toolset.registerKernelMenuButton(
         applicableModules=['Assembly'],
         description='Unreference duplicate parts.')
 
+toolset.registerKernelMenuButton(
+        buttonText='Delete non-solid instances', 
+        moduleName='assemblyMod',
+        functionName='instance_delete_shell()',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        applicableModules=['Assembly'],
+        description='Delete instances that have zero volume.')

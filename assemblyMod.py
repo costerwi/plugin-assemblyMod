@@ -75,6 +75,54 @@ def part_deleteUnused():
         del model.parts[partName]
 
 
+def part_principalProperties():
+    """Calculate and report principal mass properties"""
+    from abaqus import session
+    import numpy as np
+    from abaqusConstants import HIGH, CARTESIAN
+
+    vp = session.viewports[session.currentViewportName]
+    part = vp.displayedObject
+
+    massProp = part.getMassProperties(
+            relativeAccuracy=HIGH,
+            specifyDensity=True, density=1)
+    vol = massProp['volume']
+    if not vol:
+        raise ZeroDivisionError('Part must have volume')
+    mass = massProp['mass']
+    print('{} mass {} (density {})'.format(part.name, mass, mass/vol))
+    centroid = np.asarray(massProp['centerOfMass'])
+    Ixx, Iyy, Izz, Ixy, Iyz, Izx = massProp['momentOfInertia']
+
+    A = np.array([[Ixx, Ixy, Izx],
+                  [Ixy, Iyy, Iyz],
+                  [Izx, Iyz, Izz]])
+    evalues, evectors = np.linalg.eig(A)
+    # evectors are column eigenvectors such evectors[:,i] corresponds to evalues[i]
+
+    # Sort by eigenvalue so largest is first
+    order = np.argsort(-evalues)
+    Iz, Ix, Iy = np.take(evalues, order)
+    if (Iz - Ix)/Iz < 0.01:
+        order = np.roll(order, 1) # Roll so that Ix and Iy are same
+        Iz, Ix, Iy = np.take(evalues, order)
+
+    rot = np.take(np.transpose(evectors), order, axis=0) # Rotation matrix
+
+    name = 'Principal csys'
+    if part.features.has_key(name):
+        del part.features[name]
+    part.DatumCsysByThreePoints(
+            name=name,
+            coordSysType=CARTESIAN,
+            origin=centroid,
+            point1=centroid + rot[1],
+            point2=centroid + rot[2],
+        )
+
+    print("\tIx={}, Iy={}, Iz={}".format(Ix, Iy, Iz))
+
 def part_derefDuplicate():
     " Replace repeated parts with one part "
     from numpy import asarray, allclose

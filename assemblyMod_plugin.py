@@ -2,7 +2,7 @@
 
 Carl Osterwisch <costerwi@gmail.com> November 2013
 """
-__version__ = 0.3
+__version__ = 0.4
 
 from abaqusGui import *
 
@@ -71,6 +71,15 @@ toolset.registerKernelMenuButton(
         version=str(__version__),
         applicableModules=['Assembly'],
         description='Remove parts that are not referenced by any instances.')
+
+toolset.registerKernelMenuButton(
+        buttonText='Principal mass properties', 
+        moduleName='assemblyMod',
+        functionName='part_principalProperties()',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        applicableModules=['Part'],
+        description='Calculate and report principal mass properties.')
 
 toolset.registerKernelMenuButton(
         buttonText='Find &duplicate parts', 

@@ -19,7 +19,7 @@ def instance_delete(instances):
     vp.enableRefresh()
 
 
-def instance_delete_shell():
+def instance_delete_hollow():
     """Delete instances that have zero volume."""
     from abaqus import session
     vp = session.viewports[session.currentViewportName]

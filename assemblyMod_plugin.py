@@ -93,7 +93,7 @@ toolset.registerKernelMenuButton(
 toolset.registerKernelMenuButton(
         buttonText='Delete non-solid instances', 
         moduleName='assemblyMod',
-        functionName='instance_delete_shell()',
+        functionName='instance_delete_hollow()',
         author='Carl Osterwisch',
         version=str(__version__),
         applicableModules=['Assembly'],

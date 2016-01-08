@@ -63,12 +63,19 @@ def instance_matchname():
         if 1 == len(instNames):
             instName = instNames[0]
             toName = newNames.setdefault(instName, partName)    # no number necessary
-            ra.features.changeKey(fromName=instName, toName=toName)
-        else:
-            fmt = "%s-%%0%dd"%(partName, 1 + int(log10(len(instNames))))
-            for n, instName in enumerate(instNames):    # number each instance
-                toName = newNames.setdefault(instName, fmt%(n + 1))
+            try:
                 ra.features.changeKey(fromName=instName, toName=toName)
+            except ValueError as e:
+                print("Warning: {!s}".format(e))
+        else:
+            nDigits = 1 + int(log10(len(instNames)))
+            for n, instName in enumerate(sorted(instNames)):    # number each instance
+                toName = newNames.setdefault(instName, "{0}-{1:0{2}}".format(
+                    partName, n + 1, nDigits))
+                try:
+                    ra.features.changeKey(fromName=instName, toName=toName)
+                except ValueError as e:
+                    print("Warning: {!s}".format(e))
     # TODO: seek out and fix Loads, BCs, interactions, etc.
 
 

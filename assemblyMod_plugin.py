@@ -45,7 +45,7 @@ class instanceDeleteProcedure(AFXProcedure):
 toolset = getAFXApp().getAFXMainWindow().getPluginToolset()
 
 toolset.registerGuiMenuButton(
-        buttonText='&Delete intances...', 
+        buttonText='&Instances|&Delete...',
         object=instanceDeleteProcedure(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
@@ -55,7 +55,7 @@ toolset.registerGuiMenuButton(
         )
 
 toolset.registerKernelMenuButton(
-        buttonText='Rename instances using part name', 
+        buttonText='&Instances|&Rename using part name',
         moduleName='assemblyMod',
         functionName='instance_matchname()',
         author='Carl Osterwisch',
@@ -64,7 +64,7 @@ toolset.registerKernelMenuButton(
         description='Update instance names using part name as a base.')
 
 toolset.registerKernelMenuButton(
-        buttonText='Delete &unused parts', 
+        buttonText='&Parts|Delete &unused',
         moduleName='assemblyMod',
         functionName='part_deleteUnused()',
         author='Carl Osterwisch',
@@ -82,7 +82,7 @@ toolset.registerKernelMenuButton(
         description='Calculate and report principal mass properties.')
 
 toolset.registerKernelMenuButton(
-        buttonText='Find &duplicate parts', 
+        buttonText='&Instances|Find &duplicate parts',
         moduleName='assemblyMod',
         functionName='part_derefDuplicate()',
         author='Carl Osterwisch',
@@ -91,7 +91,7 @@ toolset.registerKernelMenuButton(
         description='Unreference duplicate parts.')
 
 toolset.registerKernelMenuButton(
-        buttonText='Delete non-solid instances', 
+        buttonText='&Instances|Delete &hollow',
         moduleName='assemblyMod',
         functionName='instance_delete_hollow()',
         author='Carl Osterwisch',

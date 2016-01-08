@@ -112,22 +112,21 @@ def part_principalProperties():
     mass = massProp['mass']
     print('{} mass {} (density {})'.format(part.name, mass, mass/vol))
     centroid = np.asarray(massProp['centerOfMass'])
-    Ixx, Iyy, Izz, Ixy, Iyz, Izx = massProp['momentOfInertia']
+    Ixx, Iyy, Izz, Ixy, Iyz, Ixz = massProp['momentOfInertia']
 
-    A = np.array([[Ixx, Ixy, Izx],
+    A = np.array([[Ixx, Ixy, Ixz],
                   [Ixy, Iyy, Iyz],
-                  [Izx, Iyz, Izz]])
+                  [Ixz, Iyz, Izz]])
     evalues, evectors = np.linalg.eig(A)
     # evectors are column eigenvectors such evectors[:,i] corresponds to evalues[i]
 
     # Sort by eigenvalue so largest is first
     order = np.argsort(-evalues)
-    Iz, Ix, Iy = np.take(evalues, order)
+    Iz, Ix, Iy = evalues[order]
     if (Iz - Ix)/Iz < 0.01:
         order = np.roll(order, 1) # Roll so that Ix and Iy are same
-        Iz, Ix, Iy = np.take(evalues, order)
-
-    rot = np.take(np.transpose(evectors), order, axis=0) # Rotation matrix
+        Iz, Ix, Iy = evalues[order]
+    rot = evectors[:, order]
 
     name = 'Principal csys'
     if part.features.has_key(name):
@@ -136,11 +135,11 @@ def part_principalProperties():
             name=name,
             coordSysType=CARTESIAN,
             origin=centroid,
-            point1=centroid + rot[1],
-            point2=centroid + rot[2],
+            point1=centroid + rot[:, 1],
+            point2=centroid + rot[:, 2],
         )
-
     print("\tIx={}, Iy={}, Iz={}".format(Ix, Iy, Iz))
+
 
 def part_derefDuplicate():
     " Replace repeated parts with one part "

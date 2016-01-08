@@ -10,11 +10,11 @@ from abaqusGui import *
 # Procedure definition
 ###########################################################################
 class instanceDeleteProcedure(AFXProcedure):
-    "Class to start the planar query procedure"
+    "Class to start the instance selection procedure"
 
     def __init__(self, owner):
         AFXProcedure.__init__(self, owner) # Construct the base class.
-                
+
         # Command
         instance_delete = AFXGuiCommand(mode=self, 
                 method='instance_delete', 
@@ -36,8 +36,34 @@ class instanceDeleteProcedure(AFXProcedure):
                 numberToPick=MANY,
                 sequenceStyle=TUPLE)    # TUPLE or ARRAY
 
-    def getNextStep(self, previousStep):
-        return None
+
+class instanceHideProcedure(AFXProcedure):
+    "Class to start the instance selection procedure"
+
+    def __init__(self, owner):
+        AFXProcedure.__init__(self, owner) # Construct the base class.
+
+        # Command
+        instance_cmd = AFXGuiCommand(mode=self,
+                method='instance_hideUnselected',
+                objectName='assemblyMod',
+                registerQuery=FALSE)
+
+        # Keywords
+        self.instancesKw = AFXObjectKeyword(
+                command=instance_cmd,
+                name='instances',
+                isRequired=TRUE)
+
+    def getFirstStep(self):
+        return AFXPickStep(
+                owner=self,
+                keyword=self.instancesKw,
+                prompt="Select instances to keep visible",
+                entitiesToPick=INSTANCES,
+                numberToPick=MANY,
+                sequenceStyle=TUPLE)    # TUPLE or ARRAY
+
 
 ###########################################################################
 # Register the plugins
@@ -52,6 +78,16 @@ toolset.registerGuiMenuButton(
         version=str(__version__),
         applicableModules=['Assembly'],
         description='Graphically select instances to remove from the assembly.'
+        )
+
+toolset.registerGuiMenuButton(
+        buttonText='&Instances|&Hide unselected...',
+        object=instanceHideProcedure(toolset),
+        kernelInitString='import assemblyMod',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        applicableModules=['Assembly'],
+        description='Graphically select instances to keep visible.'
         )
 
 toolset.registerKernelMenuButton(

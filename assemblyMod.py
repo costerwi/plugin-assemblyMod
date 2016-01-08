@@ -1,7 +1,7 @@
 """Script to adjust Abaqus/CAE assembly structure.
 
-Carl Osterwisch <costerwi@gmail.com>
-December 2013
+Carl Osterwisch <costerwi@gmail.com> December 2013
+vim:foldmethod=indent
 """
 
 def instance_delete(instances):
@@ -31,6 +31,18 @@ def instance_delete_hollow():
     for inst in remove:
         del ra.instances[inst.name]
     print("{} empty instances removed.".format(len(remove)))
+
+
+def instance_hideUnselected(instances):
+    " Called by Abaqus/CAE plugin to hide unselected instances "
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    assembly = vp.displayedObject
+    allNames = set(assembly.instances.keys())
+    selectedNames = set(i.name for i in instances)
+    hide = allNames - selectedNames
+    print("Hiding {} instances.".format(len(hide)))
+    vp.assemblyDisplay.hideInstances(instances=list(hide))
 
 
 def instance_matchname():

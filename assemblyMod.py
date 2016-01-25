@@ -28,9 +28,11 @@ def instance_delete_hollow():
     for inst in ra.instances.values():
         if not inst.part.getVolume():
             remove.append(inst)
+    vp.disableRefresh()
     for inst in remove:
         del ra.instances[inst.name]
-    print("{} empty instances removed.".format(len(remove)))
+    vp.enableRefresh()
+    print("{} hollow instances removed.".format(len(remove)))
 
 
 def instance_hideUnselected(instances):
@@ -88,10 +90,12 @@ def part_deleteUnused():
     parts = set(model.parts.keys())
     used = set([inst.partName for inst in ra.instances.values()])
     unused = parts - used
-    print("{} unused parts out of {} total to be deleted.".format(
+    print("{} unused parts out of {} deleted.".format(
         len(unused), len(parts)))
+    vp.disableColorCodeUpdates()
     for partName in unused:
         del model.parts[partName]
+    vp.enableColorCodeUpdates()
 
 
 def part_principalProperties():

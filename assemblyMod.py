@@ -4,6 +4,21 @@ Carl Osterwisch <costerwi@gmail.com> December 2013
 vim:foldmethod=indent
 """
 
+def instance_editPart(instance):
+    " Called by Abaqus/CAE plugin to edit parts "
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    part = instance.part
+    count = -1
+    for inst in ra.instances.values():
+        if inst.part == part:
+            count += 1
+    print("instance {} references part {} used by {} other instances.".format(
+        instance.name, part.name, count))
+    vp.setValues(displayedObject=part)
+
+
 def instance_delete(instances):
     " Called by Abaqus/CAE plugin to remove selected instances "
     from abaqus import session

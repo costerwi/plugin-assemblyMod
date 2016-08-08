@@ -2,7 +2,7 @@
 
 Carl Osterwisch <costerwi@gmail.com> November 2013
 """
-__version__ = 0.4
+__version__ = "0.4.1"
 
 from abaqusGui import *
 
@@ -116,6 +116,15 @@ toolset.registerKernelMenuButton(
         version=str(__version__),
         applicableModules=['Part'],
         description='Calculate and report principal mass properties.')
+
+toolset.registerKernelMenuButton(
+        buttonText='Report surface areas', 
+        moduleName='assemblyMod',
+        functionName='part_surfaceAreas()',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        applicableModules=['Part'],
+        description='Calculate and report area of all named surfaces.')
 
 toolset.registerKernelMenuButton(
         buttonText='&Instances|Find &duplicate parts',

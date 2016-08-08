@@ -160,6 +160,18 @@ def part_principalProperties():
     print("\tIx={}, Iy={}, Iz={}".format(Ix, Iy, Iz))
 
 
+def part_surfaceAreas():
+    " Calculate area of all surfaces in the current part "
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    part = vp.displayedObject
+
+    print(part.name)
+    for surfName in part.surfaces.keys():
+        surface = part.surfaces[surfName]
+        print(surfName, part.getArea(surface.faces))
+
+
 def part_derefDuplicate():
     " Replace repeated parts with one part "
     from numpy import asarray, allclose

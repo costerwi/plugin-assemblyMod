@@ -142,7 +142,7 @@ def part_principalProperties():
     # Sort by eigenvalue so largest is first
     order = np.argsort(-evalues)
     Iz, Ix, Iy = evalues[order]
-    if (Iz - Ix)/Iz < 0.01:
+    if (Iz - Ix)/Iz < 0.01: # Iz is apporximately the same as Ix
         order = np.roll(order, 1) # Roll so that Ix and Iy are same
         Iz, Ix, Iy = evalues[order]
     rot = evectors[:, order]
@@ -185,7 +185,7 @@ def part_derefDuplicate():
     for inst in ra.instances.values():
         part = inst.part
         if part.name in similarMass:
-            continue
+            continue # Already calculated this part
         massProp = part.getMassProperties(
                 relativeAccuracy=HIGH,
                 specifyDensity=True, density=1)
@@ -195,6 +195,7 @@ def part_derefDuplicate():
             similarMass.setdefault(int(round(mass)),
                     {}).setdefault(part.name, (part, massProp))
 
+    vp.disableRefresh()
     vp.disableColorCodeUpdates()
     count = 0
     for similarParts in similarMass.values():
@@ -223,4 +224,5 @@ def part_derefDuplicate():
                     count += 1
             similarParts = unmatched
     vp.enableColorCodeUpdates()
+    vp.enableRefresh()
     print("{} instances updated.".format(count))

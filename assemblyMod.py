@@ -204,14 +204,25 @@ def part_derefDuplicate():
             name, (masterPart, masterProp) = similarParts.popitem()
             masterMoment = masterProp['momentOfInertia']
             masterCentroid = asarray(masterProp['centerOfMass'])
+            masterArea = masterProp.get('area') or masterPart.getMassProperties(
+                        regions=masterPart.faces,
+                        relativeAccuracy=HIGH).get('area')
             unmatched = {}
             for name, (slavePart, slaveProp) in similarParts.items():
                 slaveMoment = slaveProp['momentOfInertia']
                 if not allclose(slaveMoment, masterMoment,
                         atol=1e-6*max(abs(asarray(slaveMoment)))):
-                    # TODO Check for rotated instances
+                    # TODO Use principal moment to check for rotated instances
                     unmatched.setdefault( name, (slavePart, slaveProp) )
                     continue
+                slaveArea = slaveProp.get('area') or slavePart.getMassProperties(
+                            regions=slavePart.faces,
+                            relativeAccuracy=HIGH).get('area')
+                if abs(masterArea - slaveArea)/masterArea > 0.01: # Surface area doesn't match
+                    slaveProp['area'] = slaveArea
+                    unmatched.setdefault( name, (slavePart, slaveProp) )
+                    continue
+
                 slaveCentroid = asarray(slaveProp['centerOfMass'])
 
                 # replace all instances of this slavePart

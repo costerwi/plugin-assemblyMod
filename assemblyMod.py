@@ -41,7 +41,7 @@ def instance_delete_hollow():
     ra = vp.displayedObject
     remove = []
     for inst in ra.instances.values():
-        if not inst.part.getVolume():
+        if 0 == len(inst.part.cells) or 0 == inst.part.getVolume():
             remove.append(inst)
     vp.disableRefresh()
     for inst in remove:

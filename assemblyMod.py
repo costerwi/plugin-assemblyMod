@@ -179,7 +179,7 @@ def part_surfaceAreas():
 
 def part_derefDuplicate():
     " Replace repeated parts with one part "
-    from numpy import asarray, allclose
+    from numpy import log10, asarray, allclose
     from abaqus import session
     from abaqusConstants import HIGH
 
@@ -197,8 +197,10 @@ def part_derefDuplicate():
         mass = massProp['mass']
         if mass:
             # Group parts by approximate mass
-            similarMass.setdefault(int(round(mass)),
+            similarMass.setdefault(int(round(log10(mass))),
                     {}).setdefault(part.name, (part, massProp))
+    if len(similarMass) > 1:
+        print("Found {} groups of parts with similar mass. Checking for similarities within those groups.".format(len(similarMass)))
 
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
@@ -212,11 +214,11 @@ def part_derefDuplicate():
             masterArea = masterProp.get('area') or masterPart.getMassProperties(
                         regions=masterPart.faces,
                         relativeAccuracy=HIGH).get('area')
-            unmatched = {}
+            unmatched = {} # Keep group of parts which do not match the current master
             for name, (slavePart, slaveProp) in similarParts.items():
-                slaveMoment = slaveProp['momentOfInertia']
+                slaveMoment = asarray(slaveProp['momentOfInertia'])
                 if not allclose(slaveMoment, masterMoment,
-                        atol=1e-6*max(abs(asarray(slaveMoment)))):
+                        atol=1e-6*max(abs(slaveMoment))):
                     # TODO Use principal moment to check for rotated instances
                     unmatched.setdefault( name, (slavePart, slaveProp) )
                     continue
@@ -228,9 +230,9 @@ def part_derefDuplicate():
                     unmatched.setdefault( name, (slavePart, slaveProp) )
                     continue
 
+                # Replace all Instances of this slavePart with the masterPart.
+                # The difference in center of mass will be used to position the masterPart.
                 slaveCentroid = asarray(slaveProp['centerOfMass'])
-
-                # replace all instances of this slavePart
                 for inst in ra.instances.values():
                     if not inst.part == slavePart:
                         continue
@@ -238,7 +240,7 @@ def part_derefDuplicate():
                     inst.translate(slaveCentroid - masterCentroid
                             + inst.getTranslation())
                     count += 1
-            similarParts = unmatched
+            similarParts = unmatched # Continue to process any remaining parts
     vp.enableColorCodeUpdates()
     vp.enableRefresh()
     print("{} instances updated.".format(count))

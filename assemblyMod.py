@@ -70,8 +70,13 @@ def instance_matchname():
     ra = vp.displayedObject
 
     parts = {}  # Identify unique parts and their instances
-    for inst in ra.instances.values():
-        parts.setdefault(inst.partName, []).append(inst.name)
+    for n, inst in enumerate(ra.instances.values()):
+        tempName = 'temp~{}'.format(n)
+        parts.setdefault(inst.partName, []).append(tempName)
+        try:
+            ra.features.changeKey(fromName=inst.name, toName=tempName)
+        except ValueError as e:
+            print("Warning: {!s}".format(e))
     print("{} unique parts in {} instances.".format(
         len(parts), len(ra.instances)))
 

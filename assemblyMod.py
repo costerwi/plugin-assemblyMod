@@ -12,8 +12,11 @@ def instance_editPart(instance):
     part = instance.part
     count = -1
     for inst in ra.instances.values():
-        if inst.part == part:
-            count += 1
+        try:
+            if inst.part == part:
+                count += 1
+        except AttributeError:
+            continue
     print("instance {} references part {} used by {} other instances.".format(
         instance.name, part.name, count))
     vp.setValues(displayedObject=part)
@@ -41,8 +44,13 @@ def instance_delete_hollow():
     ra = vp.displayedObject
     remove = []
     for inst in ra.instances.values():
-        if 0 == len(inst.part.cells) or 0 == inst.part.getVolume():
-            remove.append(inst)
+        if ra.features[inst.name].isSuppressed():
+            continue
+        try:
+            if 0 == len(inst.part.cells) or 0 == inst.part.getVolume():
+                remove.append(inst)
+        except AttributeError:
+            continue
     vp.disableRefresh()
     for inst in remove:
         del ra.instances[inst.name]
@@ -71,8 +79,14 @@ def instance_matchname():
 
     parts = {}  # Identify unique parts and their instances
     for n, inst in enumerate(ra.instances.values()):
+        if ra.features[inst.name].isSuppressed():
+            continue
         tempName = 'temp~{}'.format(n)
-        parts.setdefault(inst.partName, []).append(tempName)
+        try:
+            parts.setdefault(inst.partName, []).append(tempName)
+        except AttributeError:
+            continue
+        vp.assemblyDisplay.showInstances(instances=(inst.name,))
         try:
             ra.features.changeKey(fromName=inst.name, toName=tempName)
         except ValueError as e:
@@ -108,7 +122,12 @@ def part_deleteUnused():
     ra = vp.displayedObject
     model = mdb.models[ra.modelName]
     parts = set(model.parts.keys())
-    used = set([inst.partName for inst in ra.instances.values()])
+    used = set()
+    for inst in ra.instances.values():
+        try:
+            used.add(inst.partName)
+        except AttributeError:
+            continue
     unused = parts - used
     print("{} unused parts out of {} deleted.".format(
         len(unused), len(parts)))
@@ -188,9 +207,12 @@ def part_derefDuplicate():
 
     similarMass = {}
     for inst in ra.instances.values():
-        part = inst.part
-        if part.name in similarMass:
-            continue # Already calculated this part
+        if ra.features[inst.name].isSuppressed():
+            continue
+        try:
+            part = inst.part
+        except AttributeError:
+            continue
         massProp = part.getMassProperties(
                 relativeAccuracy=HIGH,
                 specifyDensity=True, density=1)
@@ -200,7 +222,7 @@ def part_derefDuplicate():
             similarMass.setdefault(int(round(log10(mass))),
                     {}).setdefault(part.name, (part, massProp))
     if len(similarMass) > 1:
-        print("Found {} groups of parts with similar mass. Checking for similarities within those groups.".format(len(similarMass)))
+        print("Found {} groups of parts with similar mass. Checking for duplicate parts within those groups.".format(len(similarMass)))
 
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
@@ -234,7 +256,12 @@ def part_derefDuplicate():
                 # The difference in center of mass will be used to position the masterPart.
                 slaveCentroid = asarray(slaveProp['centerOfMass'])
                 for inst in ra.instances.values():
-                    if not inst.part == slavePart:
+                    if ra.features[inst.name].isSuppressed():
+                        continue
+                    try:
+                        if not inst.part == slavePart:
+                            continue
+                    except AttributeError:
                         continue
                     inst.replace(masterPart)
                     inst.translate(slaveCentroid - masterCentroid

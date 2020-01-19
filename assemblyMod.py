@@ -253,7 +253,7 @@ def part_derefDuplicate():
                         inst, slavePart, masterPart))
                     inst.replace(masterPart)
                     instCentroid = slaveCentroid + inst.getTranslation()
-                    inst.translate(instCentroid - masterCentroid)
+                    inst.translate(slaveCentroid - masterCentroid)
 
                     # Use principalDirections to correct for rotation difference between parts
 

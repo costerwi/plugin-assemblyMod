@@ -222,7 +222,7 @@ def part_derefDuplicate():
     for similarParts in similarMass.values():
         # List of parts with similar mass
         while len(similarParts) > 1:
-            masterPart, masterProp = similarParts.pop()
+            masterPart, masterProp = similarParts.pop(0)
             masterMoment = masterProp['principalInertia']
             masterCentroid = np.asarray(masterProp['centerOfMass'])
             masterArea = masterProp.get('area') or masterPart.getMassProperties(

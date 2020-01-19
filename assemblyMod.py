@@ -256,35 +256,34 @@ def part_derefDuplicate():
                     inst.translate(slaveCentroid - masterCentroid)
 
                     # Use principalDirections to correct for rotation difference between parts
-
                     mdir = masterProp['principalDirections']
                     sdir = slaveProp['principalDirections']
                     x = mdir[0] # X vector of master part
                     y = mdir[1] # Y vector of master part
 
-                    # Find and apply correction to principal X axis
+                    # Calculate and apply correction to principal X axis direction
                     d = x.dot(sdir[0])
-                    if 1 - 1e-6 <= abs(d):
+                    if abs(d) > 0.9999:
                         axis = mdir[2] # Z
                         th = np.arccos(np.sign(d))
                     else:
                         axis = np.cross(x, sdir[0])
                         axis /= np.sqrt(axis.dot(axis)) # Make unit vector
                         th = np.arccos(d)
-                    if 0 != th:
+                    if abs(th) > 1e-4:
                         inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th)) # additional rotation
                         y = np.cos(th)*y + np.sin(th)*np.cross(axis, y) + (1 - np.cos(th))*(axis.dot(y))*axis
 
                     # Find rotation around common X axis to correct Y direction
                     d = y.dot(sdir[1])
-                    if 1 - 1e-6 <= abs(d):
+                    if abs(d) > 0.9999:
                         axis = sdir[0] # X
                         th = np.arccos(np.sign(d))
                     else:
                         axis = np.cross(y, sdir[1])
                         axis /= np.sqrt(axis.dot(axis)) # Make unit vector
                         th = np.arccos(d)
-                    if 0 != th:
+                    if abs(th) > 1e-4:
                         inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th))
 
                     count += 1

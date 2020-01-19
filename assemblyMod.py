@@ -249,6 +249,8 @@ def part_derefDuplicate():
                 for inst in ra.instances.values():
                     if not inst.part == slavePart:
                         continue
+                    print('Instance {0.name} replace {1.name} with {2.name}'.format(
+                        inst, slavePart, masterPart))
                     inst.replace(masterPart)
                     instCentroid = slaveCentroid + inst.getTranslation()
                     inst.translate(instCentroid - masterCentroid)

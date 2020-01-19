@@ -167,6 +167,14 @@ def getMassProperties(part):
 
     massProp['principalInertia'] = evalues
     massProp['principalDirections'] = np.ascontiguousarray(evectors.transpose())
+
+    massProp.update(part.queryGeometry(printResults=False))
+    v = np.mean(massProp['boundingBox'], axis=0) - massProp['centroid']
+    if v.dot(evectors[:,0]) < -1e-3: # TODO use better criteria
+        # Flip X and Z directions to ensure geometry center is in +X prinicpal direction
+        massProp['principalDirections'][0] *= -1
+        massProp['principalDirections'][2] *= -1
+
     return massProp
 
 

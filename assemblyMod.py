@@ -122,35 +122,19 @@ def part_principalProperties():
     """Calculate and report principal mass properties"""
     from abaqus import session
     import numpy as np
-    from abaqusConstants import HIGH, CARTESIAN
+    from abaqusConstants import CARTESIAN
 
     vp = session.viewports[session.currentViewportName]
     part = vp.displayedObject
 
-    massProp = part.getMassProperties(
-            relativeAccuracy=HIGH,
-            specifyDensity=True, density=1)
+    massProp = getMassProperties(part)
     vol = massProp['volume']
     if not vol:
         raise ZeroDivisionError('Part must have volume')
     mass = massProp['mass']
     print('{} mass {} (density {})'.format(part.name, mass, mass/vol))
     centroid = np.asarray(massProp['centerOfMass'])
-    Ixx, Iyy, Izz, Ixy, Iyz, Ixz = massProp['momentOfInertia']
-
-    A = np.array([[Ixx, Ixy, Ixz],
-                  [Ixy, Iyy, Iyz],
-                  [Ixz, Iyz, Izz]])
-    evalues, evectors = np.linalg.eig(A)
-    # evectors are column eigenvectors such evectors[:,i] corresponds to evalues[i]
-
-    # Sort by eigenvalue so largest is first
-    order = np.argsort(-evalues)
-    Iz, Ix, Iy = evalues[order]
-    if (Iz - Ix)/Iz < 0.01: # Iz is apporximately the same as Ix
-        order = np.roll(order, 1) # Roll so that Ix and Iy are same
-        Iz, Ix, Iy = evalues[order]
-    rot = evectors[:, order]
+    rot = massProp['principalDirections']
 
     name = 'Principal csys'
     if part.features.has_key(name):
@@ -159,10 +143,31 @@ def part_principalProperties():
             name=name,
             coordSysType=CARTESIAN,
             origin=centroid,
-            point1=centroid + rot[:, 1],
-            point2=centroid + rot[:, 2],
+            point1=centroid + rot[0], # x direction
+            point2=centroid + rot[1], # y direction
         )
-    print("\tIx={}, Iy={}, Iz={}".format(Ix, Iy, Iz))
+    print("\tIx={0[0]}, Iy={0[1]}, Iz={0[2]}".format(massProp['principalInertia']))
+
+
+def getMassProperties(part):
+    """Calculate mass properties for given part"""
+    import numpy as np
+    from abaqusConstants import HIGH
+
+    massProp = part.getMassProperties(
+            relativeAccuracy=HIGH,
+            specifyDensity=True, density=1)
+    Ixx, Iyy, Izz, Ixy, Iyz, Ixz = massProp['momentOfInertia']
+
+    A = np.array([[Ixx, Ixy, Ixz],
+                  [Ixy, Iyy, Iyz],
+                  [Ixz, Iyz, Izz]])
+    evalues, evectors = np.linalg.eigh(A)
+    # evectors are column eigenvectors such evectors[:,i] corresponds to evalues[i]
+
+    massProp['principalInertia'] = evalues
+    massProp['principalDirections'] = np.ascontiguousarray(evectors.transpose())
+    return massProp
 
 
 def part_surfaceAreas():

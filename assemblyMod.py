@@ -199,45 +199,48 @@ def part_derefDuplicate():
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
 
+    partNames = set()
     similarMass = {}
     for inst in ra.instances.values():
         part = inst.part
-        if part.name in similarMass:
+        if part.name in partNames:
             continue # Already calculated this part
+        partNames.add(part.name)
         massProp = getMassProperties(part)
         mass = massProp['mass']
         if mass:
             # Group parts by approximate mass
             similarMass.setdefault(int(round(np.log10(mass))),
-                    {}).setdefault(part.name, (part, massProp))
+                    []).append( (part, massProp) )
     if len(similarMass) > 1:
-        print("Found {} groups of parts with similar mass. Checking for similarities within those groups.".format(len(similarMass)))
+        print("Found {0} groups of parts with similar mass out of {1} total parts.".format(len(similarMass), len(partNames)))
+        print("Checking for matches within those groups.")
 
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
     count = 0
     for similarParts in similarMass.values():
-        # Dict of parts with similar mass
+        # List of parts with similar mass
         while len(similarParts) > 1:
-            name, (masterPart, masterProp) = similarParts.popitem()
+            masterPart, masterProp = similarParts.pop()
             masterMoment = masterProp['principalInertia']
             masterCentroid = np.asarray(masterProp['centerOfMass'])
             masterArea = masterProp.get('area') or masterPart.getMassProperties(
                         regions=masterPart.faces,
                         relativeAccuracy=HIGH).get('area')
-            unmatched = {} # Keep group of parts which do not match the current master
-            for name, (slavePart, slaveProp) in similarParts.items():
+            unmatched = [] # Keep group of parts which do not match the current master
+            for slavePart, slaveProp in similarParts:
                 slaveMoment = np.asarray(slaveProp['principalInertia'])
                 if not np.allclose(slaveMoment, masterMoment,
                         atol=1e-6*max(abs(slaveMoment))):
-                    unmatched.setdefault( name, (slavePart, slaveProp) )
+                    unmatched.append( (slavePart, slaveProp) )
                     continue
                 slaveArea = slaveProp.get('area') or slavePart.getMassProperties(
                             regions=slavePart.faces,
                             relativeAccuracy=HIGH).get('area')
                 if abs(masterArea - slaveArea)/masterArea > 0.01: # Surface area doesn't match
                     slaveProp['area'] = slaveArea
-                    unmatched.setdefault( name, (slavePart, slaveProp) )
+                    unmatched.append( (slavePart, slaveProp) )
                     continue
 
                 # Replace all Instances of this slavePart with the masterPart.

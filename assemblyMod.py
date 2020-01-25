@@ -255,8 +255,7 @@ def part_derefDuplicate():
             unmatched = [] # Keep group of parts which do not match the current master
             for slavePart, slaveProp in similarParts:
                 slaveMoment = np.asarray(slaveProp['principalInertia'])
-                if not np.allclose(slaveMoment, masterMoment,
-                        atol=1e-6*max(abs(slaveMoment))):
+                if not np.allclose(slaveMoment, masterMoment, rtol=1e-6):
                     unmatched.append( (slavePart, slaveProp) )
                     continue
                 slaveArea = slaveProp.get('area') or slavePart.getMassProperties(

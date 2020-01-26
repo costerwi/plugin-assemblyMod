@@ -248,7 +248,6 @@ def part_derefDuplicate():
                         relativeAccuracy=HIGH).get('area')
             if abs(masterProp['area'] - slaveProp['area'])/masterProp['area'] > 0.01: # Surface area doesn't match
                 unmatched.append( (slavePart, slaveProp) )
-                print('area not matched')
                 continue # Not a match
 
             # Calculate and compare principal moments of inertia
@@ -263,7 +262,6 @@ def part_derefDuplicate():
                         evectors[2] *= -1
             if not np.allclose(slaveProp['principalInertia'], masterProp['principalInertia'], rtol=1e-6):
                 unmatched.append( (slavePart, slaveProp) )
-                print('inertia not matched')
                 continue # Not a match
 
             # Replace all Instances of this slavePart with the masterPart.

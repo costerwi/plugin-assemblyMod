@@ -260,7 +260,7 @@ def part_derefDuplicate():
                         # Flip X and Z directions to ensure geometry center is in +X prinicpal direction
                         evectors[0] *= -1
                         evectors[2] *= -1
-            if not np.allclose(slaveProp['principalInertia'], masterProp['principalInertia'], rtol=1e-6):
+            if not np.allclose(slaveProp['principalInertia'], masterProp['principalInertia'], rtol=1e-5):
                 unmatched.append( (slavePart, slaveProp) )
                 continue # Not a match
 

@@ -186,14 +186,6 @@ def getMassProperties(part):
 
     massProp['principalInertia'] = evalues
     massProp['principalDirections'] = np.ascontiguousarray(evectors.transpose())
-
-    massProp.update(part.queryGeometry(printResults=False))
-    v = np.mean(massProp['boundingBox'], axis=0) - massProp['centroid']
-    if v.dot(evectors[:,0]) < 0:
-        # Flip X and Z directions to ensure geometry center is in +X prinicpal direction
-        massProp['principalDirections'][0] *= -1
-        massProp['principalDirections'][2] *= -1
-
     return massProp
 
 
@@ -219,7 +211,8 @@ def part_derefDuplicate():
     ra = vp.displayedObject
 
     partNames = set()
-    similarMass = {}
+    volumeParts = []
+    volumeInstances = []
     for inst in ra.instances.values():
         if ra.features[inst.name].isSuppressed():
             continue
@@ -227,96 +220,108 @@ def part_derefDuplicate():
             part = inst.part
         except AttributeError:
             continue
+        volumeInstances.append(inst)
         if part.name in partNames:
             continue # Already calculated this part
         partNames.add(part.name)
-        massProp = getMassProperties(part)
-        mass = massProp['mass']
-        if mass:
+        properties = part.queryGeometry(relativeAccuracy=0.001, printResults=False)
+        if properties.get('volume'):
             # Group parts by approximate mass
-            similarMass.setdefault(int(round(np.log10(mass))),
-                    []).append( (part, massProp) )
-    if len(similarMass) > 1:
-        print("Found {0} groups of parts with similar mass out of {1} total parts.".format(len(similarMass), len(partNames)))
-        print("Checking for matches within those groups.")
+            volumeParts.append( (part, properties) )
 
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
     count = 0
-    for similarParts in similarMass.values():
-        # List of parts with similar mass
-        while len(similarParts) > 1:
-            masterPart, masterProp = similarParts.pop(0)
-            masterMoment = masterProp['principalInertia']
-            masterCentroid = np.asarray(masterProp['centerOfMass'])
-            masterArea = masterProp.get('area') or masterPart.getMassProperties(
-                        regions=masterPart.faces,
+    while len(volumeParts) > 1:
+        masterPart, masterProp = volumeParts.pop(0)
+        unmatched = [] # Keep group of parts which do not match the current master
+        for slavePart, slaveProp in volumeParts:
+            if abs(masterProp['volume'] - slaveProp['volume'])/masterProp['volume'] > 0.01: # volumes don't match
+                unmatched.append( (slavePart, slaveProp) )
+                continue # Not a match
+
+            # Calculate and compare surface areas
+            for part, properties in ( (masterPart, masterProp), (slavePart, slaveProp) ):
+                if not properties.get('area'):
+                    properties['area'] = part.getMassProperties(
+                        regions=part.faces,
                         relativeAccuracy=HIGH).get('area')
-            unmatched = [] # Keep group of parts which do not match the current master
-            for slavePart, slaveProp in similarParts:
-                slaveMoment = np.asarray(slaveProp['principalInertia'])
-                if not np.allclose(slaveMoment, masterMoment, rtol=1e-6):
-                    unmatched.append( (slavePart, slaveProp) )
-                    continue
-                slaveArea = slaveProp.get('area') or slavePart.getMassProperties(
-                            regions=slavePart.faces,
-                            relativeAccuracy=HIGH).get('area')
-                if abs(masterArea - slaveArea)/masterArea > 0.01: # Surface area doesn't match
-                    slaveProp['area'] = slaveArea
-                    unmatched.append( (slavePart, slaveProp) )
-                    continue
+            if abs(masterProp['area'] - slaveProp['area'])/masterProp['area'] > 0.01: # Surface area doesn't match
+                unmatched.append( (slavePart, slaveProp) )
+                print('area not matched')
+                continue # Not a match
 
-                # Replace all Instances of this slavePart with the masterPart.
-                # The difference in center of mass will be used to position the masterPart.
-                slaveCentroid = np.asarray(slaveProp['centerOfMass'])
-                for inst in ra.instances.values():
-                    if ra.features[inst.name].isSuppressed():
-                        continue
-                    try:
-                        if not inst.part == slavePart:
-                            continue
-                    except AttributeError:
-                        continue
-                    print('Instance {0.name} replace {1.name} with {2.name}'.format(
-                        inst, slavePart, masterPart))
-                    inst.replace(masterPart)
-                    instCentroid = slaveCentroid + inst.getTranslation()
-                    inst.translate(slaveCentroid - masterCentroid)
+            # Calculate and compare principal moments of inertia
+            for part, properties in ( (masterPart, masterProp), (slavePart, slaveProp) ):
+                if not 'principalInertia' in properties:
+                    properties.update(getMassProperties(part))
+                    v = np.mean(properties['boundingBox'], axis=0) - properties['volumeCentroid']
+                    evectors = properties['principalDirections']
+                    if v.dot(evectors[0]) < 0:
+                        # Flip X and Z directions to ensure geometry center is in +X prinicpal direction
+                        evectors[0] *= -1
+                        evectors[2] *= -1
+            if not np.allclose(slaveProp['principalInertia'], masterProp['principalInertia'], rtol=1e-6):
+                unmatched.append( (slavePart, slaveProp) )
+                print('inertia not matched')
+                continue # Not a match
 
-                    # Use principalDirections to correct for rotation difference between parts
-                    mdir = masterProp['principalDirections']
-                    sdir = slaveProp['principalDirections']
-                    x = mdir[0] # X vector of master part
-                    y = mdir[1] # Y vector of master part
+            # Replace all Instances of this slavePart with the masterPart.
+            # The difference in center of mass will be used to position the masterPart.
+            masterCentroid = np.asarray(masterProp['centerOfMass'])
+            slaveCentroid = np.asarray(slaveProp['centerOfMass'])
+            for inst in [i for i in volumeInstances if i.part == slavePart]:
+                print('Instance {0.name} replaced {1.name} with {2.name}'.format(
+                    inst, slavePart, masterPart))
 
-                    # Calculate and apply correction to principal X axis direction
-                    d = x.dot(sdir[0])
-                    if abs(d) > 0.9999:
-                        axis = mdir[2] # Z
-                        th = np.arccos(np.sign(d))
-                    else:
-                        axis = np.cross(x, sdir[0])
-                        axis /= np.sqrt(axis.dot(axis)) # Make unit vector
-                        th = np.arccos(d)
-                    if abs(th) > 1e-4:
-                        inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th)) # additional rotation
-                        y = np.cos(th)*y + np.sin(th)*np.cross(axis, y) + (1 - np.cos(th))*(axis.dot(y))*axis
+                # Determine location of centroid
+                offset, axis, th = inst.getRotation()
+                pt = slaveCentroid + inst.getTranslation() - offset
+                th = np.deg2rad(th)
+                axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis)) # Make unit vector
+                instCentroid = np.cos(th)*pt + \
+                        np.sin(th)*np.cross(axis, pt) + \
+                        (1 - np.cos(th))*(axis.dot(pt))*axis + \
+                        offset
 
-                    # Find rotation around common X axis to correct Y direction
-                    d = y.dot(sdir[1])
-                    if abs(d) > 0.9999:
-                        axis = sdir[0] # X
-                        th = np.arccos(np.sign(d))
-                    else:
-                        axis = np.cross(y, sdir[1])
-                        axis /= np.sqrt(axis.dot(axis)) # Make unit vector
-                        th = np.arccos(d)
-                    if abs(th) > 1e-4:
-                        inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th))
+                # Replace part and adjust position
+                inst.replace(masterPart)
+                inst.translate(slaveCentroid - masterCentroid)
 
-                    count += 1
+                # Use principalDirections to correct for rotation difference between parts
+                mdir = masterProp['principalDirections']
+                sdir = slaveProp['principalDirections']
+                x = mdir[0] # X vector of master part
+                y = mdir[1] # Y vector of master part
 
-            similarParts = unmatched # Continue to process any remaining parts
+                # Calculate and apply correction to principal X axis direction
+                d = x.dot(sdir[0])
+                if abs(d) > 0.9999:
+                    axis = mdir[2] # Z
+                    th = np.arccos(np.sign(d))
+                else:
+                    axis = np.cross(x, sdir[0])
+                    axis /= np.sqrt(axis.dot(axis)) # Make unit vector
+                    th = np.arccos(d)
+                if abs(th) > 1e-4:
+                    inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th)) # additional rotation
+                    y = np.cos(th)*y + np.sin(th)*np.cross(axis, y) + (1 - np.cos(th))*(axis.dot(y))*axis
+
+                # Find rotation around common X axis to correct Y direction
+                d = y.dot(sdir[1])
+                if abs(d) > 0.9999:
+                    axis = sdir[0] # X
+                    th = np.arccos(np.sign(d))
+                else:
+                    axis = np.cross(y, sdir[1])
+                    axis /= np.sqrt(axis.dot(axis)) # Make unit vector
+                    th = np.arccos(d)
+                if abs(th) > 1e-4:
+                    inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th))
+                count += 1
+
+        volumeParts = unmatched # Continue to process any remaining parts
+
     vp.enableColorCodeUpdates()
     vp.enableRefresh()
     print("{} instances updated.".format(count))

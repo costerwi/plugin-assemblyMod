@@ -210,7 +210,7 @@ def part_surfaceAreas():
 
 
 def part_derefDuplicate():
-    " Replace repeated parts with one part "
+    " Replace instances of repeated parts with multiple instances of one part "
     import numpy as np
     from abaqus import session
     from abaqusConstants import HIGH

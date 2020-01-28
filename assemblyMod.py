@@ -4,6 +4,9 @@ Carl Osterwisch <costerwi@gmail.com> December 2013
 vim:foldmethod=indent
 """
 
+import os
+DEBUG = os.environ.get('DEBUG')
+
 def instance_editPart(instance):
     " Called by Abaqus/CAE plugin to edit parts "
     from abaqus import session
@@ -294,19 +297,27 @@ def part_derefDuplicate():
                 print('Instance {0.name} replaced {1.name} with {2.name}'.format(
                     inst, slavePart, masterPart))
 
-                # Determine location of centroid
-                offset, axis, th = inst.getRotation()
-                pt = slaveCentroid + inst.getTranslation() - offset
-                th = np.deg2rad(th)
-                axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis)) # Make unit vector
-                instCentroid = np.cos(th)*pt + \
-                        np.sin(th)*np.cross(axis, pt) + \
-                        (1 - np.cos(th))*(axis.dot(pt))*axis + \
-                        offset
+                # Determine location of instance centroid
+                instCentroid = slaveCentroid + inst.getTranslation()
+                offset, instAxis, instTh = inst.getRotation()
+                instTh = np.deg2rad(instTh)
+                if abs(instTh) > 1e-4:
+                    instRotation = rotation_matrix(instAxis, instTh)
+                    instCentroid = np.dot(instRotation, instCentroid - offset) + offset
+                else:
+                    instRotation = np.eye(3)
+
+                if DEBUG:
+                    pt = ra.ReferencePoint(instCentroid)
+                    ra.features.changeKey(fromName=pt.name, toName='CG-' + slavePart.name)
 
                 # Replace part and adjust position
                 inst.replace(masterPart)
-                inst.translate(slaveCentroid - masterCentroid)
+
+                pt = slaveCentroid - masterCentroid
+                if abs(instTh) > 1e-4:
+                    pt = axisAngle(pt, instAxis, instTh)
+                inst.translate(pt)
 
                 # Use principalDirections to correct for rotation difference between parts
                 mdir = masterProp['principalDirections']
@@ -315,28 +326,32 @@ def part_derefDuplicate():
                 y = mdir[1] # Y vector of master part
 
                 # Calculate and apply correction to principal X axis direction
+                # TODO skip if principal inertias are all equal
                 d = x.dot(sdir[0])
-                if abs(d) > 0.9999:
+                if abs(d) > 0.9999: # X axes are already aligned
                     axis = mdir[2] # Z
                     th = np.arccos(np.sign(d))
                 else:
                     axis = np.cross(x, sdir[0])
-                    axis /= np.sqrt(axis.dot(axis)) # Make unit vector
                     th = np.arccos(d)
                 if abs(th) > 1e-4:
+                    y = axisAngle(y, axis, th)
+                    axis = np.dot(instRotation, axis) # consider instance rotation
+                    axis /= np.sqrt(axis.dot(axis)) # Make unit vector
                     inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th)) # additional rotation
-                    y = np.cos(th)*y + np.sin(th)*np.cross(axis, y) + (1 - np.cos(th))*(axis.dot(y))*axis
 
                 # Find rotation around common X axis to correct Y direction
+                # TODO skip if last two principal inertias are equal
                 d = y.dot(sdir[1])
                 if abs(d) > 0.9999:
                     axis = sdir[0] # X
                     th = np.arccos(np.sign(d))
                 else:
                     axis = np.cross(y, sdir[1])
-                    axis /= np.sqrt(axis.dot(axis)) # Make unit vector
                     th = np.arccos(d)
                 if abs(th) > 1e-4:
+                    #TODO verify this last rotation
+                    axis = np.dot(instRotation, axis) # consider instance rotation
                     inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th))
                 count += 1
 

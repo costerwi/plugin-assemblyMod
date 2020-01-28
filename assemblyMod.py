@@ -226,7 +226,7 @@ def part_derefDuplicate():
         partNames.add(part.name)
         properties = part.queryGeometry(relativeAccuracy=0.001, printResults=False)
         if properties.get('volume'):
-            # Group parts by approximate mass
+            # List solid parts
             volumeParts.append( (part, properties) )
 
     vp.disableRefresh()

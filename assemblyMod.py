@@ -318,15 +318,18 @@ def part_derefDuplicate():
                 if abs(instTh) > 1e-4:
                     pt = axisAngle(pt, instAxis, instTh)
                 inst.translate(pt)
+                count += 1
 
                 # Use principalDirections to correct for rotation difference between parts
+                i1, i2, i3 = masterProp['principalInertia']
+                if (i3 - i1)/i3 < 1e-5:
+                    continue # all inertias are similar
                 mdir = masterProp['principalDirections']
                 sdir = slaveProp['principalDirections']
                 x = mdir[0] # X vector of master part
                 y = mdir[1] # Y vector of master part
 
                 # Calculate and apply correction to principal X axis direction
-                # TODO skip if principal inertias are all equal
                 d = x.dot(sdir[0])
                 if abs(d) > 0.9999: # X axes are already aligned
                     axis = mdir[2] # Z
@@ -341,7 +344,8 @@ def part_derefDuplicate():
                     inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th)) # additional rotation
 
                 # Find rotation around common X axis to correct Y direction
-                # TODO skip if last two principal inertias are equal
+                if (i3 - i2)/i3 < 1e-5:
+                    continue # last two inertias are similar
                 d = y.dot(sdir[1])
                 if abs(d) > 0.9999:
                     axis = sdir[0] # X
@@ -353,7 +357,6 @@ def part_derefDuplicate():
                     #TODO verify this last rotation
                     axis = np.dot(instRotation, axis) # consider instance rotation
                     inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th))
-                count += 1
 
         volumeParts = unmatched # Continue to process any remaining parts
 

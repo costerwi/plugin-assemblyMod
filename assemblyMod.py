@@ -313,11 +313,7 @@ def part_derefDuplicate():
 
                 # Replace part and adjust position
                 inst.replace(masterPart)
-
-                pt = slaveCentroid - masterCentroid
-                if abs(instTh) > 1e-4:
-                    pt = axisAngle(pt, instAxis, instTh)
-                inst.translate(pt)
+                inst.translate(instRotation.dot(slaveCentroid - masterCentroid))
                 count += 1
 
                 # Use principalDirections to correct for rotation difference between parts

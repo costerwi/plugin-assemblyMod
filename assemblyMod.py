@@ -303,7 +303,7 @@ def part_derefDuplicate():
                 instTh = np.deg2rad(instTh)
                 if abs(instTh) > 1e-4:
                     instRotation = rotation_matrix(instAxis, instTh)
-                    instCentroid = np.dot(instRotation, instCentroid - offset) + offset
+                    instCentroid = instRotation.dot(instCentroid - offset) + offset
                 else:
                     instRotation = np.eye(3)
 
@@ -335,7 +335,7 @@ def part_derefDuplicate():
                     th = np.arccos(d)
                 if abs(th) > 1e-4:
                     y = axisAngle(y, axis, th)
-                    axis = np.dot(instRotation, axis) # consider instance rotation
+                    axis = instRotation.dot(axis) # consider instance rotation
                     axis /= np.sqrt(axis.dot(axis)) # Make unit vector
                     inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th)) # additional rotation
 
@@ -351,7 +351,7 @@ def part_derefDuplicate():
                     th = np.arccos(d)
                 if abs(th) > 1e-4:
                     #TODO verify this last rotation
-                    axis = np.dot(instRotation, axis) # consider instance rotation
+                    axis = instRotation.dot(axis) # consider instance rotation
                     inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th))
 
         volumeParts = unmatched # Continue to process any remaining parts

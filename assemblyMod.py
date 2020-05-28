@@ -201,7 +201,8 @@ def part_surfaceAreas():
     print(part.name)
     for surfName in part.surfaces.keys():
         surface = part.surfaces[surfName]
-        print(surfName, part.getArea(surface.faces))
+        if len(surface.faces):
+            print(surfName, part.getArea(surface.faces))
 
 def axisAngle(pt, axis, th, offset = (0,0,0)):
     " Rotate a point around an axis with optional offset "

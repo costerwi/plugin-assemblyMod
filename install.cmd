@@ -24,7 +24,7 @@ if "%~dp0"=="%destination%" (
 )
 
 if not exist "%destination%" mkdir "%destination%"
-copy /Y *.* "%destination%"
+copy /Y "%~dp0\*.*" "%destination%"
 if ERRORLEVEL 0 (
     echo Success! Restart Abaqus CAE and check Plugin-ins menu.
 ) else (

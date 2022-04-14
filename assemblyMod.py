@@ -10,7 +10,6 @@ DEBUG = os.environ.get('DEBUG')
 
 def axisAngle(pt, axis, th, offset = (0,0,0)):
     " Rotate a point around an axis with optional offset "
-    import numpy as np
     axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis)) # Make unit vector
     pt -= offset
     return np.cos(th)*pt + \
@@ -21,7 +20,6 @@ def rotation_matrix(axis, theta):
     """Return the 3D rotation matrix associated with counterclockwise rotation about
     the given axis by theta radians.
     """
-    import numpy as np
     axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis))
     a = np.cos(theta / 2.0)
     b, c, d = -axis * np.sin(theta / 2.0)
@@ -267,7 +265,6 @@ def part_deleteUnused():
 def part_principalProperties():
     """Calculate and report principal mass properties"""
     from abaqus import session
-    import numpy as np
     from abaqusConstants import CARTESIAN
 
     vp = session.viewports[session.currentViewportName]
@@ -297,7 +294,6 @@ def part_principalProperties():
 
 def getMassProperties(part):
     """Calculate mass properties for given part"""
-    import numpy as np
     from abaqusConstants import HIGH
 
     massProp = part.getMassProperties(
@@ -331,7 +327,6 @@ def part_surfaceAreas():
 
 def part_derefDuplicate():
     " Replace instances of repeated parts with multiple instances of one part "
-    import numpy as np
     from abaqus import session
     from abaqusConstants import HIGH
 

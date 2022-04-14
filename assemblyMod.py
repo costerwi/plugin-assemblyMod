@@ -364,8 +364,8 @@ def part_derefDuplicate():
         masterPart, masterProp = volumeParts.pop(0)
         unmatched = [] # Keep group of parts which do not match the current master
         for slavePart, slaveProp in volumeParts:
+            unmatched.append( (slavePart, slaveProp) )
             if abs(masterProp['volume'] - slaveProp['volume'])/masterProp['volume'] > 0.01: # volumes don't match
-                unmatched.append( (slavePart, slaveProp) )
                 continue # Not a match
 
             # Calculate and compare surface areas
@@ -375,13 +375,16 @@ def part_derefDuplicate():
                         regions=part.faces,
                         relativeAccuracy=HIGH).get('area')
             if abs(masterProp['area'] - slaveProp['area'])/masterProp['area'] > 0.01: # Surface area doesn't match
-                unmatched.append( (slavePart, slaveProp) )
                 continue # Not a match
 
             # Calculate and compare principal moments of inertia
             for part, properties in ( (masterPart, masterProp), (slavePart, slaveProp) ):
                 if not 'principalInertia' in properties:
-                    properties.update(getMassProperties(part))
+                    try:
+                        properties.update(getMassProperties(part))
+                    except:
+                        unmatched.pop() # Forget this part
+                        continue
                     v = np.mean(properties['boundingBox'], axis=0) - properties['volumeCentroid']
                     evectors = properties['principalDirections']
                     if v.dot(evectors[0]) < 0:
@@ -389,8 +392,9 @@ def part_derefDuplicate():
                         evectors[0] *= -1
                         evectors[2] *= -1
             if not np.allclose(slaveProp['principalInertia'], masterProp['principalInertia'], rtol=1e-5):
-                unmatched.append( (slavePart, slaveProp) )
                 continue # Not a match
+
+            unmatched.pop() # It's a match!
 
             # Replace all Instances of this slavePart with the masterPart.
             # The difference in center of mass will be used to position the masterPart.

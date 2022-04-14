@@ -5,6 +5,7 @@ vim:foldmethod=indent
 """
 
 import os
+import numpy as np
 DEBUG = os.environ.get('DEBUG')
 
 def axisAngle(pt, axis, th, offset = (0,0,0)):
@@ -29,6 +30,92 @@ def rotation_matrix(axis, theta):
     return np.array([[aa + bb - cc - dd, 2*(bc + ad), 2*(bd - ac)],
                      [2*(bc - ad), aa + cc - bb - dd, 2*(cd + ab)],
                      [2*(bd + ac), 2*(cd - ab), aa + dd - bb - cc]])
+
+class Rotation:
+    """Class to encapsulate basic Quaternion math for 3D rotations
+
+    Carl Osterwisch, June 2020"""
+
+    def __init__(self, vec):
+        """Quaternion initialization"""
+        vec = np.asarray(vec)
+        if 4 == len(vec): # Initialize with Quaternion vector
+            self.q = vec
+        elif 3 == len(vec): # Initialize with rotation vector
+            theta = np.sqrt(vec.dot(vec))
+            axis = vec/(theta or 1)
+            self.q = np.empty(4)
+            self.q[0] = np.cos(theta/2)
+            self.q[1:] = np.sin(theta/2)*axis
+        else:
+            raise TypeError('vec parameter must be length 3 (rotation vector) or 4 (quaternion)')
+
+    @staticmethod
+    def fromRotMatrix(m):
+        m00, m01, m02 = m[0]
+        m10, m11, m12 = m[1]
+        m20, m21, m22 = m[2]
+        p = np.empty(4)
+        p[0] = np.sqrt(1 + m00 + m11 + m22)*0.5
+        p[1:] = np.array([m21 - m12, m02 - m20, m10 - m01])/(4*p[0])
+        return Rotation(p)
+
+    @staticmethod
+    def fromCsys(csys):
+        m = np.array([
+            csys.axis1.direction,
+            csys.axis2.direction,
+            csys.axis3.direction,
+        ]).transpose()
+        return Rotation.fromRotMatrix(m)
+
+    def axisAngle(self):
+        """Convert to rotation around axis, theta in radians"""
+        v = self.q[1:]
+        s = np.sqrt(v.dot(v)) # sin(theta/2)
+        if not s:
+            v += (0, 0, 1) # Unit length
+        c = self.q[0] # cos(theta/2)
+        theta = 2*np.arctan2(s, c)
+        axis = v/(s or 1)
+        return axis, theta
+
+    def vec(self):
+        """Convert to rotation vector"""
+        axis, theta = self.axisAngle()
+        return theta*axis
+
+    def __repr__(self):
+        """Print as rotation vector"""
+        return str(self.vec())
+
+    def __mul__(self, other):
+        """Scalar multiplication of rotation angle"""
+        return Rotation(other*self.vec())
+
+    def __rmul__(self, other):
+        """Scalar multiplication of rotation angle"""
+        return self*other
+
+    def __add__(self, other):
+        """Multiply Quaternions to sum their rotations"""
+        if not isinstance(other, Rotation):
+            raise TypeError('Unsupported Rotation multiplication')
+        # Note: Order of operands is flipped here since class is oriented toward
+        # rotation vectors and left to right order is more natural.
+        q1 = other.q # new rotation
+        q2 = self.q # old rotation
+        p = np.empty(4)
+        p[0] = q1[0]*q2[0] - q1[1:].dot(q2[1:])
+        p[1:] = q1[0]*q2[1:] + q2[0]*q1[1:] + np.cross(q1[1:], q2[1:])
+        return Rotation(p)
+
+    def __sub__(self, other):
+        """Difference between rotation vectors"""
+        if not isinstance(other, Rotation):
+            raise TypeError('Unsupported Rotation difference')
+        return -1*other + self
+
 
 def instance_editPart(instance):
     " Called by Abaqus/CAE plugin to edit parts "
@@ -94,6 +181,20 @@ def instance_hideUnselected(instances):
     hide = allNames - selectedNames
     print("Hiding {} instances.".format(len(hide)))
     vp.assemblyDisplay.hideInstances(instances=list(hide))
+
+
+def instance_reposition(instances, sourceCsys, destinationCsys):
+    " Reposition instances based on source and destination datum csys "
+    translation = np.asarray(destinationCsys.origin.pointOn) - sourceCsys.origin.pointOn
+    axisDirection, theta = (Rotation.fromCsys(destinationCsys) - Rotation.fromCsys(sourceCsys)).axisAngle()
+    theta = np.rad2deg(theta)
+    for instance in instances:
+        instance.translate(translation)
+        instance.rotateAboutAxis(
+                axisPoint=destinationCsys.origin.pointOn,
+                axisDirection=axisDirection,
+                angle=theta,
+                )
 
 
 def instance_matchname():

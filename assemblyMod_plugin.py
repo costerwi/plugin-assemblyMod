@@ -2,7 +2,7 @@
 
 Carl Osterwisch <costerwi@gmail.com> November 2013
 """
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 from abaqusGui import *
 
@@ -65,6 +65,63 @@ class instanceHideProcedure(AFXProcedure):
                 sequenceStyle=TUPLE)    # TUPLE or ARRAY
 
 
+class instanceRepositionProcedure(AFXProcedure):
+    "Class to start the instance selection procedure"
+
+    def __init__(self, owner):
+        AFXProcedure.__init__(self, owner) # Construct the base class.
+
+        # Command
+        instance_cmd = AFXGuiCommand(mode=self,
+                method='instance_reposition',
+                objectName='assemblyMod',
+                registerQuery=FALSE)
+
+        # Keywords
+        self.instancesKw = AFXObjectKeyword(
+                command=instance_cmd,
+                name='instances',
+                isRequired=TRUE)
+
+        self.sourceCsysKw = AFXObjectKeyword(
+                command=instance_cmd,
+                name='sourceCsys',
+                isRequired=TRUE)
+
+        self.destinationCsysKw = AFXObjectKeyword(
+                command=instance_cmd,
+                name='destinationCsys',
+                isRequired=TRUE)
+
+    def getFirstStep(self):
+        self.step1 = AFXPickStep(
+                owner=self,
+                keyword=self.instancesKw,
+                prompt="Select instances to reposition",
+                entitiesToPick=INSTANCES,
+                numberToPick=MANY,
+                sequenceStyle=TUPLE)    # TUPLE or ARRAY
+        return self.step1
+
+    def getNextStep(self, previousStep):
+        if previousStep == self.step1:
+            self.step2 = AFXPickStep(
+                    owner=self,
+                    keyword=self.sourceCsysKw,
+                    prompt="Select source csys",
+                    entitiesToPick=DATUM_CSYS,
+                    )
+            return self.step2
+        elif previousStep == self.step2:
+            return AFXPickStep(
+                    owner=self,
+                    keyword=self.destinationCsysKw,
+                    prompt="Select destination csys",
+                    entitiesToPick=DATUM_CSYS,
+                    )
+        return None # no more steps
+
+
 ###########################################################################
 # Register the plugins
 ###########################################################################
@@ -88,6 +145,16 @@ toolset.registerGuiMenuButton(
         version=str(__version__),
         applicableModules=['Assembly'],
         description='Graphically select instances to keep visible.'
+        )
+
+toolset.registerGuiMenuButton(
+        buttonText='&Instances|&Reposition using 2 csys...',
+        object=instanceRepositionProcedure(toolset),
+        kernelInitString='import assemblyMod',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        applicableModules=['Assembly'],
+        description='Reposition instances based on selected source and destination csys.'
         )
 
 toolset.registerKernelMenuButton(

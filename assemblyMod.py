@@ -7,6 +7,29 @@ vim:foldmethod=indent
 import os
 DEBUG = os.environ.get('DEBUG')
 
+def axisAngle(pt, axis, th, offset = (0,0,0)):
+    " Rotate a point around an axis with optional offset "
+    import numpy as np
+    axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis)) # Make unit vector
+    pt -= offset
+    return np.cos(th)*pt + \
+        np.sin(th)*np.cross(axis, pt) + \
+        (1 - np.cos(th))*(axis.dot(pt))*axis + offset
+
+def rotation_matrix(axis, theta):
+    """Return the 3D rotation matrix associated with counterclockwise rotation about
+    the given axis by theta radians.
+    """
+    import numpy as np
+    axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis))
+    a = np.cos(theta / 2.0)
+    b, c, d = -axis * np.sin(theta / 2.0)
+    aa, bb, cc, dd = a*a, b*b, c*c, d*d
+    bc, ad, ac, ab, bd, cd = b*c, a*d, a*c, a*b, b*d, c*d
+    return np.array([[aa + bb - cc - dd, 2*(bc + ad), 2*(bd - ac)],
+                     [2*(bc - ad), aa + cc - bb - dd, 2*(cd + ab)],
+                     [2*(bd + ac), 2*(cd - ab), aa + dd - bb - cc]])
+
 def instance_editPart(instance):
     " Called by Abaqus/CAE plugin to edit parts "
     from abaqus import session
@@ -204,28 +227,6 @@ def part_surfaceAreas():
         if len(surface.faces):
             print(surfName, part.getArea(surface.faces))
 
-def axisAngle(pt, axis, th, offset = (0,0,0)):
-    " Rotate a point around an axis with optional offset "
-    import numpy as np
-    axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis)) # Make unit vector
-    pt -= offset
-    return np.cos(th)*pt + \
-        np.sin(th)*np.cross(axis, pt) + \
-        (1 - np.cos(th))*(axis.dot(pt))*axis + offset
-
-def rotation_matrix(axis, theta):
-    """Return the 3D rotation matrix associated with counterclockwise rotation about
-    the given axis by theta radians.
-    """
-    import numpy as np
-    axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis))
-    a = np.cos(theta / 2.0)
-    b, c, d = -axis * np.sin(theta / 2.0)
-    aa, bb, cc, dd = a*a, b*b, c*c, d*d
-    bc, ad, ac, ab, bd, cd = b*c, a*d, a*c, a*b, b*d, c*d
-    return np.array([[aa + bb - cc - dd, 2*(bc + ad), 2*(bd - ac)],
-                     [2*(bc - ad), aa + cc - bb - dd, 2*(cd + ab)],
-                     [2*(bd + ac), 2*(cd - ab), aa + dd - bb - cc]])
 
 def part_derefDuplicate():
     " Replace instances of repeated parts with multiple instances of one part "

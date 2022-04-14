@@ -271,10 +271,10 @@ def part_principalProperties():
     part = vp.displayedObject
 
     massProp = getMassProperties(part)
-    vol = massProp['volume']
+    vol = massProp.get('volume')
     if not vol:
         raise ZeroDivisionError('Part must have volume')
-    mass = massProp['mass']
+    mass = massProp.get('mass', 0)
     print('{} mass {} (density {})'.format(part.name, mass, mass/vol))
     centroid = np.asarray(massProp['centerOfMass'])
     rot = massProp['principalDirections']

@@ -8,27 +8,6 @@ import os
 import numpy as np
 DEBUG = os.environ.get('DEBUG')
 
-def axisAngle(pt, axis, th, offset = (0,0,0)):
-    " Rotate a point around an axis with optional offset "
-    axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis)) # Make unit vector
-    pt -= offset
-    return np.cos(th)*pt + \
-        np.sin(th)*np.cross(axis, pt) + \
-        (1 - np.cos(th))*(axis.dot(pt))*axis + offset
-
-def rotation_matrix(axis, theta):
-    """Return the 3D rotation matrix associated with counterclockwise rotation about
-    the given axis by theta radians.
-    """
-    axis = np.asarray(axis)/np.sqrt(np.dot(axis, axis))
-    a = np.cos(theta / 2.0)
-    b, c, d = -axis * np.sin(theta / 2.0)
-    aa, bb, cc, dd = a*a, b*b, c*c, d*d
-    bc, ad, ac, ab, bd, cd = b*c, a*d, a*c, a*b, b*d, c*d
-    return np.array([[aa + bb - cc - dd, 2*(bc + ad), 2*(bd - ac)],
-                     [2*(bc - ad), aa + cc - bb - dd, 2*(cd + ab)],
-                     [2*(bd + ac), 2*(cd - ab), aa + dd - bb - cc]])
-
 class Rotation:
     """Class to encapsulate basic Quaternion math for 3D rotations
 
@@ -194,13 +173,12 @@ def instance_reposition(instances, sourceCsys, destinationCsys):
     " Reposition instances based on source and destination datum csys "
     translation = np.asarray(destinationCsys.origin.pointOn) - sourceCsys.origin.pointOn
     axisDirection, theta = (Rotation.fromCsys(destinationCsys) - Rotation.fromCsys(sourceCsys)).axisAngle()
-    theta = np.rad2deg(theta)
     for instance in instances:
         instance.translate(translation)
         instance.rotateAboutAxis(
                 axisPoint=destinationCsys.origin.pointOn,
                 axisDirection=axisDirection,
-                angle=theta,
+                angle=np.rad2deg(theta),
                 )
 
 
@@ -279,14 +257,24 @@ def part_principalProperties():
     vp = session.viewports[session.currentViewportName]
     part = vp.displayedObject
 
-    massProp = getMassProperties(part)
+    massProp = part.queryGeometry(printResults=False)
     vol = massProp.get('volume')
     if not vol:
         raise ZeroDivisionError('Part must have volume')
+    massProp.update( getMassProperties(part) )
     mass = massProp.get('mass', 0)
     print('{} mass {} (density {})'.format(part.name, mass, mass/vol))
     centroid = np.asarray(massProp['centerOfMass'])
     rot = massProp['principalDirections']
+
+    v = np.mean(massProp['boundingBox'], axis=0) - massProp['volumeCentroid']
+    rot = massProp['principalDirections']
+    if v.dot(rot[1]) < 0:
+        # Flip Y
+        rot[1] *= -1
+        if DEBUG:
+            print('Flipped', rot[0])
+    rot[2] = np.cross(rot[0], rot[1])
 
     name = 'Principal csys'
     if part.features.has_key(name):
@@ -356,7 +344,7 @@ def part_derefDuplicate():
         if part.name in partNames:
             continue # Already calculated this part
         partNames.add(part.name)
-        properties = part.queryGeometry(relativeAccuracy=0.001, printResults=False)
+        properties = part.queryGeometry(printResults=False)
         if properties.get('volume'):
             # List solid parts
             volumeParts.append( (part, properties) )
@@ -369,7 +357,7 @@ def part_derefDuplicate():
         unmatched = [] # Keep group of parts which do not match the current master
         for slavePart, slaveProp in volumeParts:
             unmatched.append( (slavePart, slaveProp) )
-            if abs(masterProp['volume'] - slaveProp['volume'])/masterProp['volume'] > 0.01: # volumes don't match
+            if abs(masterProp['volume'] - slaveProp['volume'])/masterProp['volume'] > 0.002: # volumes don't match
                 continue # Not a match
 
             # Calculate and compare surface areas
@@ -378,7 +366,7 @@ def part_derefDuplicate():
                     properties['area'] = part.getMassProperties(
                         regions=part.faces,
                         relativeAccuracy=HIGH).get('area')
-            if abs(masterProp['area'] - slaveProp['area'])/masterProp['area'] > 0.01: # Surface area doesn't match
+            if abs(masterProp['area'] - slaveProp['area'])/masterProp['area'] > 0.002: # Surface area doesn't match
                 continue # Not a match
 
             # Calculate and compare principal moments of inertia
@@ -391,10 +379,10 @@ def part_derefDuplicate():
                         continue
                     v = np.mean(properties['boundingBox'], axis=0) - properties['volumeCentroid']
                     evectors = properties['principalDirections']
-                    if v.dot(evectors[0]) < 0:
-                        # Flip X and Z directions to ensure geometry center is in +X prinicpal direction
-                        evectors[0] *= -1
-                        evectors[2] *= -1
+                    if v.dot(evectors[1]) < 0:
+                        # Flip Y
+                        evectors[1] *= -1
+                    evectors[2] = np.cross(evectors[0], evectors[1])
             if not np.allclose(slaveProp['principalInertia'], masterProp['principalInertia'], rtol=1e-5):
                 continue # Not a match
 
@@ -411,12 +399,8 @@ def part_derefDuplicate():
                 # Determine location of instance centroid
                 instCentroid = slaveCentroid + inst.getTranslation()
                 offset, instAxis, instTh = inst.getRotation()
-                instTh = np.deg2rad(instTh)
-                if abs(instTh) > 1e-4:
-                    instRotation = rotation_matrix(instAxis, instTh)
-                    instCentroid = instRotation.dot(instCentroid - offset) + offset
-                else:
-                    instRotation = np.eye(3)
+                instRotation = Rotation(np.asarray(instAxis) * np.deg2rad(instTh))
+                instCentroid = instRotation.apply(instCentroid - offset) + offset
 
                 if DEBUG:
                     pt = ra.ReferencePoint(instCentroid)
@@ -424,46 +408,14 @@ def part_derefDuplicate():
 
                 # Replace part and adjust position
                 inst.replace(masterPart)
-                inst.translate(instRotation.dot(slaveCentroid - masterCentroid))
+                inst.translate(instRotation.apply(slaveCentroid - masterCentroid))
                 count += 1
 
                 # Use principalDirections to correct for rotation difference between parts
-                i1, i2, i3 = masterProp['principalInertia']
-                if (i3 - i1)/i3 < 1e-5:
-                    continue # all inertias are similar
-                mdir = masterProp['principalDirections']
-                sdir = slaveProp['principalDirections']
-                x = mdir[0] # X vector of master part
-                y = mdir[1] # Y vector of master part
-
-                # Calculate and apply correction to principal X axis direction
-                d = x.dot(sdir[0])
-                if abs(d) > 0.9999: # X axes are already aligned
-                    axis = mdir[2] # Z
-                    th = np.arccos(np.sign(d))
-                else:
-                    axis = np.cross(x, sdir[0])
-                    th = np.arccos(d)
-                if abs(th) > 1e-4:
-                    y = axisAngle(y, axis, th)
-                    axis = instRotation.dot(axis) # consider instance rotation
-                    axis /= np.sqrt(axis.dot(axis)) # Make unit vector
-                    inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th)) # additional rotation
-
-                # Find rotation around common X axis to correct Y direction
-                if (i3 - i2)/i3 < 1e-5:
-                    continue # last two inertias are similar
-                d = y.dot(sdir[1])
-                if abs(d) > 0.9999:
-                    axis = sdir[0] # X
-                    th = np.arccos(np.sign(d))
-                else:
-                    axis = np.cross(y, sdir[1])
-                    th = np.arccos(d)
-                if abs(th) > 1e-4:
-                    #TODO verify this last rotation
-                    axis = instRotation.dot(axis) # consider instance rotation
-                    inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th))
+                mdir = Rotation.fromRotMatrix(masterProp['principalDirections'].transpose())
+                sdir = Rotation.fromRotMatrix(slaveProp['principalDirections'].transpose())
+                axis, th = (instRotation - (mdir - sdir) - instRotation).axisAngle()
+                inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th))
 
         volumeParts = unmatched # Continue to process any remaining parts
 

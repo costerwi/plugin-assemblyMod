@@ -98,7 +98,7 @@ class Rotation:
     def __add__(self, other):
         """Multiply Quaternions to sum their rotations"""
         if not isinstance(other, Rotation):
-            raise TypeError('Unsupported Rotation multiplication')
+            raise TypeError('Unsupported Rotation addition')
         # Note: Order of operands is flipped here since class is oriented toward
         # rotation vectors and left to right order is more natural.
         q1 = other.q # new rotation
@@ -108,11 +108,20 @@ class Rotation:
         p[1:] = q1[0]*q2[1:] + q2[0]*q1[1:] + np.cross(q1[1:], q2[1:])
         return Rotation(p)
 
+    def inv(self):
+        """Inverse"""
+        return Rotation(self.q * [1, -1, -1, -1])
+
     def __sub__(self, other):
         """Difference between rotation vectors"""
         if not isinstance(other, Rotation):
             raise TypeError('Unsupported Rotation difference')
-        return -1*other + self
+        return other.inv() + self
+
+    def apply(self, pt):
+        """Apply rotation to a point"""
+        v = Rotation([0, pt[0], pt[1], pt[2]])
+        return (self.inv() + v + self).q[1:]
 
 
 def instance_editPart(instance):

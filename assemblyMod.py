@@ -1,9 +1,9 @@
 """Script to adjust Abaqus/CAE assembly structure.
 
 Carl Osterwisch <costerwi@gmail.com> December 2013
-vim:foldmethod=indent
 """
 
+from __future__ import print_function
 import os
 import numpy as np
 DEBUG = os.environ.get('DEBUG')

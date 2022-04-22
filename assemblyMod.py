@@ -1,4 +1,4 @@
-"""Script to adjust Abaqus/CAE assembly structure.
+"""Scripts to adjust Abaqus/CAE assembly structure.
 
 Carl Osterwisch <costerwi@gmail.com> December 2013
 """
@@ -8,114 +8,77 @@ import os
 import numpy as np
 DEBUG = os.environ.get('DEBUG')
 
-class Rotation:
-    """Class to encapsulate basic Quaternion math for 3D rotations
+_principal_csys = 'Principal csys' # feature name
 
-    Carl Osterwisch, June 2020"""
+try:
+    # Load Rotation class from scipy if it's available (CAE >= 2020)
+    from scipy.spatial.transform import Rotation
+except ImportError:
+    from simpleTransform import Rotation
 
-    def __init__(self, vec):
-        """Quaternion initialization"""
-        vec = np.asarray(vec)
-        if 4 == len(vec): # Initialize with Quaternion vector
-            self.q = vec
-        elif 3 == len(vec): # Initialize with rotation vector
-            theta = np.sqrt(vec.dot(vec))
-            axis = vec/(theta or 1)
-            self.q = np.empty(4)
-            self.q[0] = np.cos(theta/2)
-            self.q[1:] = np.sin(theta/2)*axis
-        else:
-            raise TypeError('vec parameter must be length 3 (rotation vector) or 4 (quaternion)')
+class ARotation(Rotation):
+    """Extend Rotation class with some useful Abaqus CAE methods
 
-    @staticmethod
-    def fromRotMatrix(m):
-        m00, m01, m02 = m[0]
-        m10, m11, m12 = m[1]
-        m20, m21, m22 = m[2]
-        p = np.empty(4)
-        p[0] = np.sqrt(1 + m00 + m11 + m22)*0.5
-        p[1:] = np.array([m21 - m12, m02 - m20, m10 - m01])/(4*p[0])
-        return Rotation(p)
+    Carl Osterwisch, June 2022"""
 
-    @staticmethod
-    def fromCsys(csys):
-        m = np.array([
+    @classmethod
+    def from_matrix(cls, matrix):
+        """Initialize from rotation matrix
+
+        >>> m = ARotation.from_rotvec([0.2, 0.3, 0.4]).as_matrix()
+        >>> R = ARotation.from_matrix(m)
+        >>> R.__class__
+        <class '__main__.ARotation'>
+        >>> R.as_rotvec()
+        array([0.2, 0.3, 0.4])
+        """
+
+        if hasattr(Rotation, 'from_matrix'):
+            return cls.from_quat(Rotation.from_matrix(matrix).as_quat())
+        if hasattr(cls, 'align_vectors'):
+            return cls.align_vectors(matrix.T, np.eye(3))[0] #workaround 1
+        return cls.match_vectors(matrix.T, np.eye(3))[0] #workaround 2
+
+    @classmethod
+    def from_csys(cls, csys):
+        """Define rotation based on DatumCsys orientation"""
+
+        matrix = np.array([
             csys.axis1.direction,
             csys.axis2.direction,
             csys.axis3.direction,
-        ]).transpose()
-        return Rotation.fromRotMatrix(m)
+        ]).T
+        return cls.from_matrix(matrix)
 
-    def axisAngle(self):
-        """Convert to rotation around axis, theta in radians"""
-        v = self.q[1:]
-        s = np.sqrt(v.dot(v)) # sin(theta/2)
-        if not s:
-            v += (0, 0, 1) # Unit length
-        c = self.q[0] # cos(theta/2)
-        theta = 2*np.arctan2(s, c)
-        axis = v/(s or 1)
-        return axis, theta
+    def as_axisAngle(self):
+        """Convert to rotation around axis
 
-    def vec(self):
-        """Convert to rotation vector"""
-        axis, theta = self.axisAngle()
-        return theta*axis
-
-    def __repr__(self):
-        """Print as rotation vector"""
-        return str(self.vec())
-
-    def __mul__(self, other):
-        """Scalar multiplication of rotation angle"""
-        return Rotation(other*self.vec())
-
-    def __rmul__(self, other):
-        """Scalar multiplication of rotation angle"""
-        return self*other
-
-    def __add__(self, other):
-        """Multiply Quaternions to sum their rotations"""
-        if not isinstance(other, Rotation):
-            raise TypeError('Unsupported Rotation addition')
-        # Note: Order of operands is flipped here since class is oriented toward
-        # rotation vectors and left to right order is more natural.
-        q1 = other.q # new rotation
-        q2 = self.q # old rotation
-        p = np.empty(4)
-        p[0] = q1[0]*q2[0] - q1[1:].dot(q2[1:])
-        p[1:] = q1[0]*q2[1:] + q2[0]*q1[1:] + np.cross(q1[1:], q2[1:])
-        return Rotation(p)
-
-    def inv(self):
-        """Inverse"""
-        return Rotation(self.q * [1, -1, -1, -1])
-
-    def __sub__(self, other):
-        """Difference between rotation vectors"""
-        if not isinstance(other, Rotation):
-            raise TypeError('Unsupported Rotation difference')
-        return other.inv() + self
-
-    def apply(self, pt):
-        """Apply rotation to a point"""
-        v = Rotation([0, pt[0], pt[1], pt[2]])
-        return (self.inv() + v + self).q[1:]
+        >>> axis = np.array([0.6, 0.8, 0])
+        >>> angle = np.radians(90)
+        >>> r = ARotation.from_rotvec(axis*angle)
+        >>> axis2, angle2 = r.as_axisAngle()
+        >>> np.allclose(axis, axis2)
+        True
+        >>> np.degrees(angle2)
+        90.0
+        """
+        v = self.as_rotvec()
+        theta = np.sqrt(v.dot(v))
+        if not theta:
+            return np.array([0., 0., 1.]), 0.
+        return v/theta, theta
 
 
 def instance_editPart(instance):
-    " Called by Abaqus/CAE plugin to edit parts "
+    " Called by Abaqus/CAE plugin to edit part associated with the selcted instance "
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
     part = instance.part
     count = -1
     for inst in ra.instances.values():
-        try:
-            if inst.part == part:
-                count += 1
-        except AttributeError:
-            continue
+        if hasattr(inst, 'part') and inst.part == part:
+            count += 1
     print("instance {} references part {} used by {} other instances.".format(
         instance.name, part.name, count))
     vp.setValues(displayedObject=part)
@@ -172,7 +135,9 @@ def instance_hideUnselected(instances):
 def instance_reposition(instances, sourceCsys, destinationCsys):
     " Reposition instances based on source and destination datum csys "
     translation = np.asarray(destinationCsys.origin.pointOn) - sourceCsys.origin.pointOn
-    axisDirection, theta = (Rotation.fromCsys(destinationCsys) - Rotation.fromCsys(sourceCsys)).axisAngle()
+    R1 = ARotation.from_csys(sourceCsys)
+    R2 = ARotation.from_csys(destinationCsys)
+    axisDirection, theta = (R1 * (R2.inv())).as_axisAngle()
     for instance in instances:
         instance.translate(translation)
         instance.rotateAboutAxis(
@@ -249,71 +214,79 @@ def part_deleteUnused():
     vp.enableColorCodeUpdates()
 
 
-def part_principalProperties():
-    """Calculate and report principal mass properties"""
-    from abaqus import session
-    from abaqusConstants import CARTESIAN
+def getAreaProperties(part, properties={}):
+    from abaqusConstants import HIGH
 
-    vp = session.viewports[session.currentViewportName]
-    part = vp.displayedObject
-
-    massProp = part.queryGeometry(printResults=False)
-    vol = massProp.get('volume')
-    if not vol:
-        raise ZeroDivisionError('Part must have volume')
-    massProp.update( getMassProperties(part) )
-    mass = massProp.get('mass', 0)
-    print('{} mass {} (density {})'.format(part.name, mass, mass/vol))
-    centroid = np.asarray(massProp['centerOfMass'])
-    rot = massProp['principalDirections']
-
-    v = np.mean(massProp['boundingBox'], axis=0) - massProp['volumeCentroid']
-    rot = massProp['principalDirections']
-    if v.dot(rot[1]) < 0:
-        # Flip Y
-        rot[1] *= -1
-        if DEBUG:
-            print('Flipped', rot[0])
-    rot[2] = np.cross(rot[0], rot[1])
-
-    name = 'Principal csys'
-    if part.features.has_key(name):
-        del part.features[name]
-    part.DatumCsysByThreePoints(
-            name=name,
-            coordSysType=CARTESIAN,
-            origin=centroid,
-            point1=centroid + rot[0], # x direction
-            point2=centroid + rot[1], # y direction
-        )
-    print("\tIx={0[0]}, Iy={0[1]}, Iz={0[2]}".format(massProp['principalInertia']))
+    if not properties.get('area'):
+        properties.update(
+                {k: v for k, v in part.getMassProperties(
+                    regions=part.faces,
+                    relativeAccuracy=HIGH,
+                    specifyDensity=True, density=1).items() if k.startswith('area')
+                }
+            )
+    return properties
 
 
-def getMassProperties(part):
+def getMassProperties(part, properties={}):
     """Calculate mass properties for given part"""
     from abaqusConstants import HIGH
 
-    massProp = part.getMassProperties(
-            relativeAccuracy=HIGH,
-            specifyDensity=True, density=1)
-    Ixx, Iyy, Izz, Ixy, Iyz, Ixz = massProp['momentOfInertia']
+    if not 'momentOfInertia' in properties:
+        properties.update(
+            { k: v for k, v in
+                part.getMassProperties(
+                    relativeAccuracy=HIGH,
+                    specifyDensity=True, density=1).items()
+                if not k.startswith('area')
+            }
+        )
 
-    A = np.array([[Ixx, Ixy, Ixz],
-                  [Ixy, Iyy, Iyz],
-                  [Ixz, Iyz, Izz]])
-    evalues, evectors = np.linalg.eigh(A)
-    # evectors are column eigenvectors such evectors[:,i] corresponds to evalues[i]
+    if not 'principalInertia' in properties:
+        Ixx, Iyy, Izz, Ixy, Iyz, Ixz = properties['momentOfInertia']
+        A = np.array([[Ixx, Ixy, Ixz],
+                      [Ixy, Iyy, Iyz],
+                      [Ixz, Iyz, Izz]])
+        evalues, evectors = np.linalg.eigh(A)
+        # evectors are column eigenvectors such evectors[:,i] corresponds to evalues[i]
 
-    massProp['principalInertia'] = evalues
-    massProp['principalDirections'] = np.ascontiguousarray(evectors.transpose())
-    return massProp
+        properties['principalInertia'] = evalues
+        properties['principalAxes'] = np.ascontiguousarray(evectors.T)
+
+    return properties
 
 
-def part_surfaceAreas():
+def getPrincipalDirections(part, properties={}):
+    """Calculate consistent principal directions"""
+
+    if not 'principalDirections' in properties:
+        getMassProperties(part, properties)
+        getAreaProperties(part, properties)
+        o = np.asarray(properties['areaCentroid']) - properties['volumeCentroid'] # for orientation
+        evectors = properties['principalAxes'].T
+        d = o.dot(evectors) # project onto principal axes
+        evectors *= np.where( d < 0, -1, 1 ) # flip for consistency
+
+        # Ensure right-handed coordinate system
+        ax = set( np.argsort( np.abs(d) )[:2] ) # two axes with largest centroid difference
+        if not 0 in ax:
+            evectors[:,0] = np.cross(evectors[:,1], evectors[:,2])
+        elif not 1 in ax:
+            evectors[:,1] = np.cross(evectors[:,2], evectors[:,0])
+        else:
+            evectors[:,2] = np.cross(evectors[:,0], evectors[:,1])
+        properties['principalDirections'] = np.ascontiguousarray(evectors.T)
+
+    return properties
+
+
+def part_surfaceAreas(part = None):
     " Calculate area of all surfaces in the current part "
+
     from abaqus import session
-    vp = session.viewports[session.currentViewportName]
-    part = vp.displayedObject
+    if not part:
+        vp = session.viewports[session.currentViewportName]
+        part = vp.displayedObject
 
     print(part.name)
     for surfName in part.surfaces.keys():
@@ -322,103 +295,124 @@ def part_surfaceAreas():
             print(surfName, part.getArea(surface.faces))
 
 
-def part_derefDuplicate():
-    " Replace instances of repeated parts with multiple instances of one part "
+def part_principalProperties(part = None, properties={}):
+    """Calculate and report principal mass properties"""
     from abaqus import session
+    from abaqusConstants import CARTESIAN
+
+    if not part:
+        vp = session.viewports[session.currentViewportName]
+        part = vp.displayedObject
+
+    getPrincipalDirections(part, properties)
+    vol = properties.get('volume')
+    if not vol:
+        raise ZeroDivisionError('Part must have volume')
+    mass = properties.get('mass', 0)
+    print('{} mass {} (density {})'.format(part.name, mass, mass/vol))
+    centroid = np.asarray(properties['volumeCentroid'])
+    rot = properties['principalDirections']
+
+    if part.features.has_key(_principal_csys):
+        del part.features[_principal_csys]
+    part.DatumCsysByThreePoints(
+            name=_principal_csys,
+            coordSysType=CARTESIAN,
+            origin=centroid,
+            point1=centroid + rot[0], # x direction
+            point2=centroid + rot[1], # y direction
+        )
+    print("\tIx={0[0]}, Iy={0[1]}, Iz={0[2]}".format(properties['principalInertia']))
+
+
+def part_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
+    " Recognize and replace instances of repeated parts with multiple instances of one part "
+    from time import time
+    from abaqus import session, mdb
     from abaqusConstants import HIGH
 
-    vp = session.viewports[session.currentViewportName]
-    ra = vp.displayedObject
+    if not ra:
+        vp = session.viewports[session.currentViewportName]
+        ra = vp.displayedObject # rootAssembly
+    model = mdb.models[ra.modelName]
 
-    partNames = set()
-    volumeParts = []
-    volumeInstances = []
-    for inst in ra.instances.values():
-        if ra.features[inst.name].isSuppressed():
-            continue
-        try:
-            part = inst.part
-        except AttributeError:
-            continue
-        volumeInstances.append(inst)
-        if part.name in partNames:
-            continue # Already calculated this part
-        partNames.add(part.name)
-        properties = part.queryGeometry(printResults=False)
-        if properties.get('volume'):
-            # List solid parts
-            volumeParts.append( (part, properties) )
-
+    partProperties = {}
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
     count = 0
-    while len(volumeParts) > 1:
-        masterPart, masterProp = volumeParts.pop(0)
-        unmatched = [] # Keep group of parts which do not match the current master
-        for slavePart, slaveProp in volumeParts:
-            unmatched.append( (slavePart, slaveProp) )
-            if abs(masterProp['volume'] - slaveProp['volume'])/masterProp['volume'] > 0.002: # volumes don't match
-                continue # Not a match
+    t0 = time()
+    for inst in ra.instances.values():
+        if ra.features[inst.name].isSuppressed():
+            continue # skip suppressed instances
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if not inst.dependent:
+            continue # skip independent instances
+        properties = partProperties.setdefault(inst.part.name, {})
+        if not 'mass' in properties:
+            # it's a new part
+            getMassProperties(inst.part, properties)
+            mass = properties.get('mass', 0)
+            if mass < 10*atol:
+                continue # the part has no mass
+            for otherName, otherProps in partProperties.items():
+                # It's a new part; check for match with any previous parts
+                if inst.part.name == otherName:
+                    continue # skip same part
+                if 'replacement' in otherProps:
+                    continue # skip parts that are replaced by other parts
+                if  not np.allclose(mass, otherProps['mass'], rtol=rtol, atol=atol):
+                    continue # Mass does not a match
+                inertia = properties.get('principalInertia', 0)
+                otherInertia = otherProps.get('principalInertia', 0)
+                if not np.allclose(inertia, otherInertia, rtol=rtol, atol=atol):
+                    continue # Different mass properties
+                area = getAreaProperties(inst.part, properties).get('area', 0)
+                otherArea = getAreaProperties(model.parts[otherName], otherProps).get('area', 0)
+                if not np.allclose(area, otherArea, rtol=rtol, atol=atol): # Surface area doesn't match
+                    continue
+                properties['replacement'] = otherName
+                break # found a match!
 
-            # Calculate and compare surface areas
-            for part, properties in ( (masterPart, masterProp), (slavePart, slaveProp) ):
-                if not properties.get('area'):
-                    properties['area'] = part.getMassProperties(
-                        regions=part.faces,
-                        relativeAccuracy=HIGH).get('area')
-            if abs(masterProp['area'] - slaveProp['area'])/masterProp['area'] > 0.002: # Surface area doesn't match
-                continue # Not a match
+        newPartName = properties.get('replacement')
+        if not newPartName:
+            continue # No replacement found
+        newProps = partProperties.get(newPartName)
+        newPart = model.parts[newPartName]
+        print('Instance {0.name} replaced {1.name} with {2.name}'.format(
+            inst, inst.part, newPart))
+        if DEBUG:
+            part_principalProperties(inst.part, properties)
+            if not newPart.features.has_key(_principal_csys):
+                part_principalProperties(newPart, newProps)
 
-            # Calculate and compare principal moments of inertia
-            for part, properties in ( (masterPart, masterProp), (slavePart, slaveProp) ):
-                if not 'principalInertia' in properties:
-                    try:
-                        properties.update(getMassProperties(part))
-                    except:
-                        unmatched.pop() # Forget this part
-                        continue
-                    v = np.mean(properties['boundingBox'], axis=0) - properties['volumeCentroid']
-                    evectors = properties['principalDirections']
-                    if v.dot(evectors[1]) < 0:
-                        # Flip Y
-                        evectors[1] *= -1
-                    evectors[2] = np.cross(evectors[0], evectors[1])
-            if not np.allclose(slaveProp['principalInertia'], masterProp['principalInertia'], rtol=1e-5):
-                continue # Not a match
+        newCentroid = np.asarray(newProps['volumeCentroid'])
+        oldCentroid = np.asarray(properties['volumeCentroid'])
 
-            unmatched.pop() # It's a match!
+        # Determine location of instance centroid
+        inst.ConvertConstraints() # convert any position constraints to absolute positions
+        instCentroid = oldCentroid + inst.getTranslation()
+        offset, instAxis, instTh = inst.getRotation()
+        instRotation = ARotation.from_rotvec(np.asarray(instAxis) * np.radians(instTh)).inv()
+        instCentroid = instRotation.apply(instCentroid - offset) + offset
 
-            # Replace all Instances of this slavePart with the masterPart.
-            # The difference in center of mass will be used to position the masterPart.
-            masterCentroid = np.asarray(masterProp['centerOfMass'])
-            slaveCentroid = np.asarray(slaveProp['centerOfMass'])
-            for inst in [i for i in volumeInstances if i.part == slavePart]:
-                print('Instance {0.name} replaced {1.name} with {2.name}'.format(
-                    inst, slavePart, masterPart))
+        if DEBUG and not ra.features.has_key('CG-' + inst.part.name):
+            pt = ra.ReferencePoint(instCentroid)
+            ra.features.changeKey(fromName=pt.name, toName='CG-' + inst.part.name)
 
-                # Determine location of instance centroid
-                instCentroid = slaveCentroid + inst.getTranslation()
-                offset, instAxis, instTh = inst.getRotation()
-                instRotation = Rotation(np.asarray(instAxis) * np.deg2rad(instTh))
-                instCentroid = instRotation.apply(instCentroid - offset) + offset
+        # Replace part and adjust centroid position
+        inst.replace(newPart)
+        count += 1
+        inst.translate(instRotation.apply(oldCentroid - newCentroid))
 
-                if DEBUG:
-                    pt = ra.ReferencePoint(instCentroid)
-                    ra.features.changeKey(fromName=pt.name, toName='CG-' + slavePart.name)
-
-                # Replace part and adjust position
-                inst.replace(masterPart)
-                inst.translate(instRotation.apply(slaveCentroid - masterCentroid))
-                count += 1
-
-                # Use principalDirections to correct for rotation difference between parts
-                mdir = Rotation.fromRotMatrix(masterProp['principalDirections'].transpose())
-                sdir = Rotation.fromRotMatrix(slaveProp['principalDirections'].transpose())
-                axis, th = (instRotation - (mdir - sdir) - instRotation).axisAngle()
-                inst.rotateAboutAxis(instCentroid, axis, np.rad2deg(th))
-
-        volumeParts = unmatched # Continue to process any remaining parts
+        # Use principalDirections to correct for rotation difference between parts
+        getPrincipalDirections(newPart, newProps)
+        newDir = ARotation.from_matrix(newProps['principalDirections'].T)
+        getPrincipalDirections(inst.part, properties)
+        oldDir = ARotation.from_matrix(properties['principalDirections'].T)
+        axis, th = (instRotation.inv() * (newDir * oldDir) * instRotation).as_axisAngle()
+        inst.rotateAboutAxis(instCentroid, axis, np.degrees(th))
 
     vp.enableColorCodeUpdates()
     vp.enableRefresh()
-    print("{} instances updated.".format(count))
+    print("{} instances updated in {:.1f} seconds".format(count, time() - t0))

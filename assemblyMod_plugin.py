@@ -2,7 +2,7 @@
 
 Carl Osterwisch <costerwi@gmail.com> November 2013
 """
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 from abaqusGui import *
 
@@ -200,7 +200,7 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         applicableModules=['Assembly'],
-        description='Unreference duplicate parts.')
+        description='Recognize and replace instances of similar parts with multiple instances of one part')
 
 toolset.registerKernelMenuButton(
         buttonText='&Instances|Delete &hollow',

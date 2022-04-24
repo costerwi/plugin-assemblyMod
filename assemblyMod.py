@@ -137,8 +137,9 @@ def instance_reposition(instances, sourceCsys, destinationCsys):
     translation = np.asarray(destinationCsys.origin.pointOn) - sourceCsys.origin.pointOn
     R1 = ARotation.from_csys(sourceCsys)
     R2 = ARotation.from_csys(destinationCsys)
-    axisDirection, theta = (R1 * (R2.inv())).as_axisAngle()
+    axisDirection, theta = (R2 * (R1.inv())).as_axisAngle()
     for instance in instances:
+        instance.ConvertConstraints()
         instance.translate(translation)
         instance.rotateAboutAxis(
                 axisPoint=destinationCsys.origin.pointOn,

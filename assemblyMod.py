@@ -68,6 +68,182 @@ class ARotation(Rotation):
             return np.array([0., 0., 1.]), 0.
         return v/theta, theta
 
+# {{{1 ASSEMBLY INSTANCES DELETE
+
+def instance_delete(instances):
+    " Called by Abaqus/CAE plugin to delete selected instances "
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    print("{}/{} instances deleted.".format(
+        len(instances), len(ra.instances)))
+    ra.deleteFeatures([inst.name for inst in instances])
+
+
+def instance_delete_hidden():
+    """Delete part instances that are currently hidden."""
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    displayed = set(vp.assemblyDisplay.visibleInstances) # set of names
+    remove = []
+    for inst in ra.instances.values():
+        if not inst.name in displayed:
+            remove.append(inst)
+    instance_delete(remove)
+
+
+def instance_delete_suppressed():
+    """Delete part instances that are currently suppressed."""
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    remove = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            remove.append(inst)
+    instance_delete(remove)
+
+# {{{1 ASSEMBLY INSTANCES SUPPRESS
+
+def instance_suppress(instances):
+    " Called by Abaqus/CAE plugin to delete selected instances "
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    print("{}/{} instances selected for suppression.".format(
+        len(instances), len(ra.instances)))
+    ra.suppressFeatures([inst.name for inst in instances])
+
+
+def instance_suppress_part(instances):
+    " Called by Abaqus/CAE plugin to suppress selected instances "
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    parts = set([inst.part.name for inst in instances]) # set of part names
+    suppress = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            continue
+        if inst.part.name in parts:
+            suppress.append(inst)
+    instance_suppress(suppress)
+
+
+def instance_suppress_noArea():
+    """Suppress instances that have zero area."""
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    suppress = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            continue
+        if 0 == len(inst.part.faces):
+            suppress.append(inst)
+    instance_suppress(suppress)
+
+
+def instance_suppress_noVolume():
+    """Suppress instances that have zero volume."""
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    suppress = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            continue
+        if 0 == len(inst.part.cells) and 0 == inst.part.getVolume():
+            suppress.append(inst)
+    instance_suppress(suppress)
+
+
+def instance_suppress_invert():
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    resume = []
+    suppress = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            resume.append(inst.name)
+        else:
+            suppress.append(inst.name)
+    ra.suppressFeatures(suppress)
+    ra.resumeFeatures(resume)
+
+
+def instance_suppress_resumeAll():
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    resume = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            resume.append(inst.name)
+    ra.resumeFeatures(resume)
+
+# {{{1 ASSEMBLY INSTANCES HIDE
+
+def instance_hide(instances):
+    " Called by Abaqus/CAE plugin to hide selected instances "
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    print("{}/{} instances hidden.".format(
+        len(instances), len(ra.instances)))
+    vp.assemblyDisplay.hideInstances([inst.name for inst in instances])
+
+
+def instance_hide_part(instances):
+    " Called by Abaqus/CAE plugin to hide parts"
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    parts = set([inst.part.name for inst in instances]) # set of part names
+    hide = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if inst.part.name in parts:
+            hide.append(inst)
+    instance_hide(hide)
+
+
+def instance_hide_invert():
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    displayed = set(vp.assemblyDisplay.visibleInstances) # set of names
+    show = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if not inst.name in displayed:
+            show.append(inst.name)
+    vp.assemblyDisplay.setValues(visibleInstances=show)
+
+
+def instance_hide_showAll():
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    vp.assemblyDisplay.setValues( visibleInstances=ra.instances.keys() )
+
+# {{{1 ASSEMBLY INSTANCES
 
 def instance_editPart(instance):
     " Called by Abaqus/CAE plugin to edit part associated with the selcted instance "
@@ -82,54 +258,6 @@ def instance_editPart(instance):
     print("instance {} references part {} used by {} other instances.".format(
         instance.name, part.name, count))
     vp.setValues(displayedObject=part)
-
-
-def instance_delete(instances):
-    " Called by Abaqus/CAE plugin to remove selected instances "
-    from abaqus import session
-    vp = session.viewports[session.currentViewportName]
-    ra = vp.displayedObject
-    print("{}/{} instances selected for deletion.".format(
-        len(instances), len(ra.instances)))
-    vp.disableRefresh()
-    vp.disableColorCodeUpdates()
-    for i in instances:
-        del ra.features[i.name]
-    vp.enableColorCodeUpdates()
-    vp.enableRefresh()
-
-
-def instance_delete_hollow():
-    """Delete instances that have zero volume."""
-    from abaqus import session
-    vp = session.viewports[session.currentViewportName]
-    ra = vp.displayedObject
-    remove = []
-    for inst in ra.instances.values():
-        if ra.features[inst.name].isSuppressed():
-            continue
-        try:
-            if 0 == len(inst.part.cells) or 0 == inst.part.getVolume():
-                remove.append(inst)
-        except AttributeError:
-            continue
-    vp.disableRefresh()
-    for inst in remove:
-        del ra.instances[inst.name]
-    vp.enableRefresh()
-    print("{} hollow instances removed.".format(len(remove)))
-
-
-def instance_hideUnselected(instances):
-    " Called by Abaqus/CAE plugin to hide unselected instances "
-    from abaqus import session
-    vp = session.viewports[session.currentViewportName]
-    assembly = vp.displayedObject
-    allNames = set(assembly.instances.keys())
-    selectedNames = set(i.name for i in instances)
-    hide = allNames - selectedNames
-    print("Hiding {} instances.".format(len(hide)))
-    vp.assemblyDisplay.hideInstances(instances=list(hide))
 
 
 def instance_reposition(instances, sourceCsys, destinationCsys):
@@ -191,139 +319,6 @@ def instance_matchname():
                 except ValueError as e:
                     print("Warning: {!s}".format(e))
     # TODO: seek out and fix Loads, BCs, interactions, etc.
-
-
-def part_deleteUnused():
-    " Called by Abaqus/CAE plugin to remove unused parts "
-    from abaqus import session, mdb
-    vp = session.viewports[session.currentViewportName]
-    ra = vp.displayedObject
-    model = mdb.models[ra.modelName]
-    parts = set(model.parts.keys())
-    used = set()
-    for inst in ra.instances.values():
-        try:
-            used.add(inst.partName)
-        except AttributeError:
-            continue
-    unused = parts - used
-    print("{} unused parts out of {} deleted.".format(
-        len(unused), len(parts)))
-    vp.disableColorCodeUpdates()
-    for partName in unused:
-        del model.parts[partName]
-    vp.enableColorCodeUpdates()
-
-
-def getAreaProperties(part, properties={}):
-    from abaqusConstants import HIGH
-
-    if not properties.get('area'):
-        properties.update(
-                {k: v for k, v in part.getMassProperties(
-                    regions=part.faces,
-                    relativeAccuracy=HIGH,
-                    specifyDensity=True, density=1).items() if k.startswith('area')
-                }
-            )
-    return properties
-
-
-def getMassProperties(part, properties={}):
-    """Calculate mass properties for given part"""
-    from abaqusConstants import HIGH
-
-    if not 'momentOfInertia' in properties:
-        properties.update(
-            { k: v for k, v in
-                part.getMassProperties(
-                    relativeAccuracy=HIGH,
-                    specifyDensity=True, density=1).items()
-                if not k.startswith('area')
-            }
-        )
-
-    if not 'principalInertia' in properties:
-        Ixx, Iyy, Izz, Ixy, Iyz, Ixz = properties['momentOfInertia']
-        A = np.array([[Ixx, Ixy, Ixz],
-                      [Ixy, Iyy, Iyz],
-                      [Ixz, Iyz, Izz]])
-        evalues, evectors = np.linalg.eigh(A)
-        # evectors are column eigenvectors such evectors[:,i] corresponds to evalues[i]
-
-        properties['principalInertia'] = evalues
-        properties['principalAxes'] = np.ascontiguousarray(evectors.T)
-
-    return properties
-
-
-def getPrincipalDirections(part, properties={}):
-    """Calculate consistent principal directions"""
-
-    if not 'principalDirections' in properties:
-        getMassProperties(part, properties)
-        getAreaProperties(part, properties)
-        o = np.asarray(properties['areaCentroid']) - properties['volumeCentroid'] # for orientation
-        evectors = properties['principalAxes'].T
-        d = o.dot(evectors) # project onto principal axes
-        evectors *= np.where( d < 0, -1, 1 ) # flip for consistency
-
-        # Ensure right-handed coordinate system
-        ax = set( np.argsort( np.abs(d) )[:2] ) # two axes with largest centroid difference
-        if not 0 in ax:
-            evectors[:,0] = np.cross(evectors[:,1], evectors[:,2])
-        elif not 1 in ax:
-            evectors[:,1] = np.cross(evectors[:,2], evectors[:,0])
-        else:
-            evectors[:,2] = np.cross(evectors[:,0], evectors[:,1])
-        properties['principalDirections'] = np.ascontiguousarray(evectors.T)
-
-    return properties
-
-
-def part_surfaceAreas(part = None):
-    " Calculate area of all surfaces in the current part "
-
-    from abaqus import session
-    if not part:
-        vp = session.viewports[session.currentViewportName]
-        part = vp.displayedObject
-
-    print(part.name)
-    for surfName in part.surfaces.keys():
-        surface = part.surfaces[surfName]
-        if len(surface.faces):
-            print(surfName, part.getArea(surface.faces))
-
-
-def part_principalProperties(part = None, properties={}):
-    """Calculate and report principal mass properties"""
-    from abaqus import session
-    from abaqusConstants import CARTESIAN
-
-    if not part:
-        vp = session.viewports[session.currentViewportName]
-        part = vp.displayedObject
-
-    getPrincipalDirections(part, properties)
-    vol = properties.get('volume')
-    if not vol:
-        raise ZeroDivisionError('Part must have volume')
-    mass = properties.get('mass', 0)
-    print('{} mass {} (density {})'.format(part.name, mass, mass/vol))
-    centroid = np.asarray(properties['volumeCentroid'])
-    rot = properties['principalDirections']
-
-    if part.features.has_key(_principal_csys):
-        del part.features[_principal_csys]
-    part.DatumCsysByThreePoints(
-            name=_principal_csys,
-            coordSysType=CARTESIAN,
-            origin=centroid,
-            point1=centroid + rot[0], # x direction
-            point2=centroid + rot[1], # y direction
-        )
-    print("\tIx={0[0]}, Iy={0[1]}, Iz={0[2]}".format(properties['principalInertia']))
 
 
 def part_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
@@ -417,3 +412,160 @@ def part_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
     vp.enableColorCodeUpdates()
     vp.enableRefresh()
     print("{} instances updated in {:.1f} seconds".format(count, time() - t0))
+
+# {{{1 ASSEMBLY PARTS
+
+def part_deleteUnused():
+    " Called by Abaqus/CAE plugin to remove unused parts "
+    from abaqus import session, mdb
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    model = mdb.models[ra.modelName]
+    parts = set(model.parts.keys())
+    used = set()
+    for inst in ra.instances.values():
+        try:
+            used.add(inst.partName)
+        except AttributeError:
+            continue
+    unused = parts - used
+    print("{}/{} parts deleted.".format(
+        len(unused), len(parts)))
+    vp.disableColorCodeUpdates()
+    for partName in unused:
+        del model.parts[partName]
+    vp.enableColorCodeUpdates()
+
+
+def part_instanceUnused():
+    " Instance parts that are not referenced by any instances "
+    from abaqus import session, mdb
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    model = mdb.models[ra.modelName]
+    unused = set(model.parts.keys()) # set of all part names
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue
+        if inst.partName in unused:
+            unused.remove(inst.partName)
+    for partName in sorted(unused):
+        i = 0
+        while not i or instName in ra.instances.keys():
+            i += 1
+            instName = '{}-{}'.format(partName, i)
+        ra.Instance(name=instName, part=model.parts[partName], dependent=True)
+    print('Added {} instances'.format(len(unused)))
+
+# {{{1 PART
+
+def getAreaProperties(part, properties={}):
+    from abaqusConstants import HIGH
+
+    if not properties.get('area'):
+        properties.update(
+                {k: v for k, v in part.getMassProperties(
+                    regions=part.faces,
+                    relativeAccuracy=HIGH,
+                    specifyDensity=True, density=1).items() if k.startswith('area')
+                }
+            )
+    return properties
+
+
+def getMassProperties(part, properties={}):
+    """Calculate mass properties for given part"""
+    from abaqusConstants import HIGH
+
+    if not 'momentOfInertia' in properties:
+        properties.update(
+            { k: v for k, v in
+                part.getMassProperties(
+                    relativeAccuracy=HIGH,
+                    specifyThickness=True, thickness=0.1,
+                    specifyDensity=True, density=1).items()
+                if not k.startswith('area')
+            }
+        )
+
+    if not 'principalInertia' in properties:
+        Ixx, Iyy, Izz, Ixy, Iyz, Ixz = properties['momentOfInertia']
+        A = np.array([[Ixx, Ixy, Ixz],
+                      [Ixy, Iyy, Iyz],
+                      [Ixz, Iyz, Izz]])
+        evalues, evectors = np.linalg.eigh(A)
+        # evectors are column eigenvectors such evectors[:,i] corresponds to evalues[i]
+
+        properties['principalInertia'] = evalues
+        properties['principalAxes'] = np.ascontiguousarray(evectors.T)
+
+    return properties
+
+
+def getPrincipalDirections(part, properties={}):
+    """Calculate consistent principal directions"""
+
+    if not 'principalDirections' in properties:
+        getMassProperties(part, properties)
+        getAreaProperties(part, properties)
+        o = np.asarray(properties['areaCentroid']) - properties['volumeCentroid'] # for orientation
+        evectors = properties['principalAxes'].T
+        d = o.dot(evectors) # project onto principal axes
+        evectors *= np.where( d < 0, -1, 1 ) # flip for consistency
+
+        # Ensure right-handed coordinate system
+        ax = set( np.argsort( np.abs(d) )[:2] ) # two axes with largest centroid difference
+        if not 0 in ax:
+            evectors[:,0] = np.cross(evectors[:,1], evectors[:,2])
+        elif not 1 in ax:
+            evectors[:,1] = np.cross(evectors[:,2], evectors[:,0])
+        else:
+            evectors[:,2] = np.cross(evectors[:,0], evectors[:,1])
+        properties['principalDirections'] = np.ascontiguousarray(evectors.T)
+
+    return properties
+
+
+def part_surfaceAreas(part = None):
+    " Calculate area of all surfaces in the current part "
+
+    from abaqus import session
+    if not part:
+        vp = session.viewports[session.currentViewportName]
+        part = vp.displayedObject
+
+    print(part.name)
+    for surfName in part.surfaces.keys():
+        surface = part.surfaces[surfName]
+        if len(surface.faces):
+            print(surfName, part.getArea(surface.faces))
+
+
+def part_principalProperties(part = None, properties={}):
+    """Calculate and report principal mass properties"""
+    from abaqus import session
+    from abaqusConstants import CARTESIAN
+
+    if not part:
+        vp = session.viewports[session.currentViewportName]
+        part = vp.displayedObject
+
+    getPrincipalDirections(part, properties)
+    vol = properties.get('volume')
+    if not vol:
+        raise ZeroDivisionError('Part must have volume')
+    mass = properties.get('mass', 0)
+    print('{} mass {} (density {})'.format(part.name, mass, mass/vol))
+    centroid = np.asarray(properties['volumeCentroid'])
+    rot = properties['principalDirections']
+
+    if part.features.has_key(_principal_csys):
+        del part.features[_principal_csys]
+    part.DatumCsysByThreePoints(
+            name=_principal_csys,
+            coordSysType=CARTESIAN,
+            origin=centroid,
+            point1=centroid + rot[0], # x direction
+            point2=centroid + rot[1], # y direction
+        )
+    print("\tIx={0[0]}, Iy={0[1]}, Iz={0[2]}".format(properties['principalInertia']))

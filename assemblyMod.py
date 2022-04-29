@@ -350,6 +350,7 @@ def part_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
             getMassProperties(inst.part, properties)
             mass = properties.get('mass') or 0
             if mass < 10*atol:
+                properties['mass'] = 0
                 continue # the part has no mass
             for otherName, otherProps in partProperties.items():
                 # It's a new part; check for match with any previous parts
@@ -357,6 +358,8 @@ def part_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
                     continue # skip same part
                 if 'replacement' in otherProps:
                     continue # skip parts that are replaced by other parts
+                if not otherProps.get('mass'):
+                    continue # skip parts that don't have mass
                 if  not np.allclose(mass, otherProps['mass'], rtol=rtol, atol=atol):
                     continue # Mass does not a match
                 inertia = properties.get('principalInertia')

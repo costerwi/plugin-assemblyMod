@@ -15,6 +15,7 @@ class InstanceSelectProcedure(AFXProcedure):
     def __init__(self, owner, prompt, method, number=MANY):
         AFXProcedure.__init__(self, owner) # Construct the base class.
         self._prompt = prompt
+        self._number = number
 
         # Command
         command = AFXGuiCommand(mode=self,
@@ -23,9 +24,12 @@ class InstanceSelectProcedure(AFXProcedure):
                 registerQuery=FALSE)
 
         # Keywords
+        name = 'instance'
+        if MANY == number:
+            name += 's'
         self.instancesKw = AFXObjectKeyword(
                 command=command,
-                name='instances',
+                name=name,
                 isRequired=TRUE)
 
     def getFirstStep(self):
@@ -34,7 +38,7 @@ class InstanceSelectProcedure(AFXProcedure):
                 keyword=self.instancesKw,
                 prompt='Select ' + self._prompt,
                 entitiesToPick=INSTANCES,
-                numberToPick=MANY,
+                numberToPick=self._number,
                 sequenceStyle=TUPLE)    # TUPLE or ARRAY
 
 

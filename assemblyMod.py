@@ -396,7 +396,7 @@ def part_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
         inst.ConvertConstraints() # convert any position constraints to absolute positions
         instCentroid = oldCentroid + inst.getTranslation()
         offset, instAxis, instTh = inst.getRotation()
-        instRotation = ARotation.from_rotvec(np.asarray(instAxis) * np.radians(instTh)).inv()
+        instRotation = ARotation.from_rotvec(np.asarray(instAxis) * np.radians(instTh))
         instCentroid = instRotation.apply(instCentroid - offset) + offset
 
         if DEBUG and not ra.features.has_key('CG-' + inst.part.name):
@@ -413,7 +413,7 @@ def part_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
         newDir = ARotation.from_matrix(newProps['principalDirections'].T)
         getPrincipalDirections(inst.part, properties)
         oldDir = ARotation.from_matrix(properties['principalDirections'].T)
-        axis, th = (instRotation.inv() * (newDir * oldDir) * instRotation).as_axisAngle()
+        axis, th = (instRotation * (oldDir * newDir) * instRotation.inv()).as_axisAngle()
         inst.rotateAboutAxis(instCentroid, axis, np.degrees(th))
 
     vp.enableColorCodeUpdates()
@@ -522,7 +522,7 @@ def getPrincipalDirections(part, properties={}):
         evectors *= np.where( d < 0, -1, 1 ) # flip for consistency
 
         # Ensure right-handed coordinate system
-        ax = set( np.argsort( np.abs(d) )[:2] ) # two axes with largest centroid difference
+        ax = set( np.argsort( np.abs(d) )[1:] ) # two axes with largest centroid difference
         if not 0 in ax:
             evectors[:,0] = np.cross(evectors[:,1], evectors[:,2])
         elif not 1 in ax:

@@ -111,12 +111,31 @@ menu = ['&Instances']
 toolset.registerKernelMenuButton(
         buttonText='|'.join(menu) + '|Find &duplicate Parts',
         moduleName='assemblyMod',
-        functionName='part_derefDuplicate()',
+        functionName='assembly_derefDuplicate()',
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
         applicableModules=['Assembly'],
-        description='Use mass properties to identify and replace instances of similar parts with multiple instances of one part')
+        description='Use mass properties to automatically identify and replace instances of similar parts with multiple instances of one part. '
+            'Two parts must have the same mass, area, and primary moments of inertia must be within 0.0001% to be recognized as equal.'
+        )
+
+class InstanceDuplicatePicked(InstanceSelectProcedure):
+    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
+    pass
+
+toolset.registerGuiMenuButton(
+        buttonText='|'.join(menu) + '|&Pick Duplicate Parts...',
+        object=InstanceDuplicatePicked(toolset, 'instances to search for common parts', 'instance_derefDup'),
+        kernelInitString='import assemblyMod',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        applicableModules=['Assembly'],
+        description='Graphically select instances to replace with a common part. '
+            'Replacement will not happen if mass properties are significantly different from each other. '
+            'Two parts must have the same mass, area, and primary moments of inertia must be within 1% to be recognized as equal.'
+        )
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Reposition using 2 csys...',
@@ -301,8 +320,6 @@ toolset.registerKernelMenuButton(
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
         applicableModules=['Assembly'],
         description='Show hidden instances and hide shown instances.')
-
-
 
 toolset.registerKernelMenuButton(
         buttonText='|'.join(menu) + '|&Show all',

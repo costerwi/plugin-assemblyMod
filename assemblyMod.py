@@ -319,23 +319,40 @@ def instance_matchname():
     # TODO: seek out and fix Loads, BCs, interactions, etc.
 
 
-def part_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
-    " Recognize and replace instances of repeated parts with multiple instances of one part "
-    from time import time
-    from abaqus import session, mdb
-    from abaqusConstants import HIGH
+def assembly_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
+    """Recognize and replace instances of repeated parts with multiple instances of one part.
 
+    Note tighter default rtol and atol since this is automatically checking all instances.
+    """
+
+    from abaqus import session, mdb
     if not ra:
         vp = session.viewports[session.currentViewportName]
         ra = vp.displayedObject # rootAssembly
     model = mdb.models[ra.modelName]
+    instances = ra.instances.values() # all instances in the assembly
+    return instance_commonPart(instances, rtol=rtol, atol=atol)
 
+
+def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
+    """Recognize and replace instances of repeated parts with multiple instances of one part.
+
+    Note looser default rtol and atol since only checking instances that have been specified.
+    """
+
+    from time import time
+    from abaqus import session, mdb
+    from abaqusConstants import HIGH
+
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject # rootAssembly
+    model = mdb.models[ra.modelName]
     partProperties = {}
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
     count = 0
     t0 = time()
-    for inst in ra.instances.values():
+    for inst in instances:
         if ra.features[inst.name].isSuppressed():
             continue # skip suppressed instances
         if not hasattr(inst, 'part'):

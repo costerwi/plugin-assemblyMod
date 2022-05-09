@@ -557,6 +557,7 @@ def part_principalProperties(part = None, properties={}):
     if not part:
         vp = session.viewports[session.currentViewportName]
         part = vp.displayedObject
+        properties={}
 
     getPrincipalDirections(part, properties)
     vol = properties.get('volume')

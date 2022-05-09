@@ -5,7 +5,8 @@ Abaqus/CAE plugins to work with Parts and their Instances
 
 - Instances
   - **Edit Part...** - Graphically select instance to edit its part.
-  - **Find duplicate parts** - Use mass properties to identify and replace instances of similar parts with multiple instances of one part.
+  - **Find duplicate parts** - Use mass properties to automatically identify and replace instances of similar parts with multiple instances of one part. Two parts must have the same mass, area, and primary moments of inertia within 0.0001% to be recognized as equal.
+  - **Pick Duplicate Parts...** - Graphically select instances to replace with a common part. Replacement will not happen if mass properties are significantly different from each other. Two parts must have the same mass, area, and primary moments of inertia within 1% to be recognized as equal.
   - **Reposition using 2 csys...** - Reposition instances based on selected source and destination csys.
   - **Rename using part name** - Update instance names using part name as a base.
   - Delete

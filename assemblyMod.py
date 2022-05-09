@@ -287,12 +287,10 @@ def instance_matchname():
     for n, inst in enumerate(ra.instances.values()):
         if ra.features[inst.name].isSuppressed():
             continue
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
         tempName = 'temp~{}'.format(n)
-        try:
-            parts.setdefault(inst.partName, []).append(tempName)
-        except AttributeError:
-            continue
-        vp.assemblyDisplay.showInstances(instances=(inst.name,))
+        parts.setdefault(inst.partName, []).append(tempName)
         try:
             ra.features.changeKey(fromName=inst.name, toName=tempName)
         except ValueError as e:

@@ -413,7 +413,7 @@ def part_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
         newDir = ARotation.from_matrix(newProps['principalDirections'].T)
         getPrincipalDirections(inst.part, properties)
         oldDir = ARotation.from_matrix(properties['principalDirections'].T)
-        axis, th = (instRotation * (oldDir * newDir) * instRotation.inv()).as_axisAngle()
+        axis, th = (instRotation * newDir * oldDir.inv() * instRotation.inv()).as_axisAngle()
         inst.rotateAboutAxis(instCentroid, axis, np.degrees(th))
 
     vp.enableColorCodeUpdates()

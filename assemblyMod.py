@@ -431,10 +431,8 @@ def part_deleteUnused():
     parts = set(model.parts.keys())
     used = set()
     for inst in ra.instances.values():
-        try:
+        if hasattr(inst, 'part'):
             used.add(inst.partName)
-        except AttributeError:
-            continue
     unused = parts - used
     print("{}/{} parts deleted.".format(
         len(unused), len(parts)))

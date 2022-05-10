@@ -331,7 +331,7 @@ def assembly_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
         ra = vp.displayedObject # rootAssembly
     model = mdb.models[ra.modelName]
     instances = ra.instances.values() # all instances in the assembly
-    return instance_commonPart(instances, rtol=rtol, atol=atol)
+    return instance_derefDup(instances, rtol=rtol, atol=atol)
 
 
 def instance_derefDup(instances, rtol=1e-2, atol=1e-8):

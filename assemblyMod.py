@@ -347,12 +347,25 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject # rootAssembly
     model = mdb.models[ra.modelName]
+
+    # Prepare to prioritize instances according to popularity of their parts
+    partInstances = {} # List of all instances associtated to each part
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        partInstances.setdefault(inst.part.name, []).append(inst.name)
+    popularity = {}
+    for instList in partInstances.values():
+        for instName in instList:
+            popularity[instName] = len(instList) # Number of instances referring to the same part
+
+    # Loop over specified instances to find similar parts
     partProperties = {}
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
     count = 0
     t0 = time()
-    for inst in instances:
+    for inst in sorted(instances, reverse=True, key=lambda i: popularity[i.name]):
         if ra.features[inst.name].isSuppressed():
             continue # skip suppressed instances
         if not hasattr(inst, 'part'):

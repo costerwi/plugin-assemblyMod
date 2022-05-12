@@ -117,7 +117,7 @@ toolset.registerKernelMenuButton(
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
         applicableModules=['Assembly'],
         description='Use mass properties to automatically identify and replace instances of similar parts with multiple instances of one part. '
-            'Two parts must have the same mass, area, and primary moments of inertia within 0.0001% to be recognized as equal.'
+            'Two parts must have the same mass, area, and primary moments of inertia within 0.01% to be recognized as equal.'
         )
 
 class InstanceDuplicatePicked(InstanceSelectProcedure):

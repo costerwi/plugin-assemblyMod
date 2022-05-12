@@ -319,7 +319,7 @@ def instance_matchname():
     # TODO: seek out and fix Loads, BCs, interactions, etc.
 
 
-def assembly_derefDuplicate(ra=None, rtol=1e-6, atol=1e-8):
+def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):
     """Recognize and replace instances of repeated parts with multiple instances of one part.
 
     Note tighter default rtol and atol since this is automatically checking all instances.
@@ -377,7 +377,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
             # it's a new part
             getMassProperties(inst.part, properties)
             mass = properties.get('mass') or 0
-            if mass < 10*atol:
+            if mass < atol:
                 properties['mass'] = 0
                 continue # the part has no mass
             for otherName, otherProps in partProperties.items():
@@ -388,19 +388,19 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
                     continue # skip parts that are replaced by other parts
                 if not otherProps.get('mass'):
                     continue # skip parts that don't have mass
-                if  not np.allclose(mass, otherProps['mass'], rtol=rtol, atol=atol):
+                if  not np.allclose(otherProps['mass'], mass, rtol=rtol, atol=0):
                     continue # Mass does not a match
                 inertia = properties.get('principalInertia')
                 otherInertia = otherProps.get('principalInertia')
                 if np.any(None == inertia) or np.any(None == otherInertia):
                     continue # Must both have inertia
-                if not np.allclose(inertia, otherInertia, rtol=rtol, atol=atol):
+                if not np.allclose(otherInertia, inertia, rtol=rtol, atol=0):
                     continue # Different mass properties
                 area = getAreaProperties(inst.part, properties).get('area')
                 otherArea = getAreaProperties(model.parts[otherName], otherProps).get('area')
                 if not (area and otherArea):
                     continue # Must both have area
-                if not np.allclose(area, otherArea, rtol=rtol, atol=atol): # Surface area doesn't match
+                if not np.allclose(otherArea, area, rtol=rtol, atol=0): # Surface area doesn't match
                     continue # Different area
                 properties['replacement'] = otherName
                 break # found a match!

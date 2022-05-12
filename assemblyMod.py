@@ -543,6 +543,8 @@ def getPrincipalDirections(part, properties={}):
         getMassProperties(part, properties)
         getAreaProperties(part, properties)
         o = np.asarray(properties['areaCentroid']) - properties['volumeCentroid'] # for orientation
+        if np.allclose(o, np.zeros(3)):
+            o = np.ones(3) # use global axis if no centroid difference
         evectors = properties['principalAxes'].T
         d = o.dot(evectors) # project onto principal axes
         evectors *= np.where( d < 0, -1, 1 ) # flip for consistency

@@ -162,16 +162,9 @@ class InstanceEditPicked(InstanceSelectProcedure):
     """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
     pass
 
-toolset.registerGuiMenuButton(
-        buttonText='|'.join(menu) + '|&Edit Part...',
-        object=InstanceEditPicked(toolset, 'instance to edit part', 'instance_editPart', ONE),
-        kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
-        description='Graphically select instance to edit its part.'
-        )
 
 # {{{1 ASSEMBLY INSTANCES DELETE
 
@@ -347,6 +340,17 @@ toolset.registerKernelMenuButton(
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
         applicableModules=['Assembly'],
         description='Remove parts that are not referenced by any instances.')
+
+toolset.registerGuiMenuButton(
+        buttonText='|'.join(menu) + '|&Edit Picked...',
+        object=InstanceEditPicked(toolset, 'instance to edit part', 'part_edit', ONE),
+        kernelInitString='import assemblyMod',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        applicableModules=['Assembly', 'Interaction', 'Load'],
+        description='Graphically select instance to edit its part.'
+        )
 
 toolset.registerKernelMenuButton(
         buttonText='|'.join(menu) + '|&Instance unused Parts',

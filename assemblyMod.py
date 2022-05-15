@@ -243,21 +243,6 @@ def instance_hide_showAll():
 
 # {{{1 ASSEMBLY INSTANCES
 
-def instance_editPart(instance):
-    " Called by Abaqus/CAE plugin to edit part associated with the selcted instance "
-    from abaqus import session
-    vp = session.viewports[session.currentViewportName]
-    ra = vp.displayedObject
-    part = instance.part
-    count = -1
-    for inst in ra.instances.values():
-        if hasattr(inst, 'part') and inst.part == part:
-            count += 1
-    print("instance {} references part {} used by {} other instances.".format(
-        instance.name, part.name, count))
-    vp.setValues(displayedObject=part)
-
-
 def instance_reposition(instances, sourceCsys, destinationCsys):
     " Reposition instances based on source and destination datum csys "
     translation = np.asarray(destinationCsys.origin.pointOn) - sourceCsys.origin.pointOn
@@ -466,6 +451,21 @@ def part_deleteUnused():
     for partName in unused:
         del model.parts[partName]
     vp.enableColorCodeUpdates()
+
+
+def part_edit(instance):
+    " Called by Abaqus/CAE plugin to edit part associated with the selcted instance "
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    part = instance.part
+    count = -1
+    for inst in ra.instances.values():
+        if hasattr(inst, 'part') and inst.part == part:
+            count += 1
+    print("instance {} references part {} used by {} other instances.".format(
+        instance.name, part.name, count))
+    vp.setValues(displayedObject=part)
 
 
 def part_instanceUnused():

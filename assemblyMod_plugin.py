@@ -208,7 +208,7 @@ toolset.registerGuiMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Graphically select instances to suppress in the assembly.'
         )
 
@@ -223,7 +223,7 @@ toolset.registerGuiMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Select parts to suppress their instancse.'
         )
 
@@ -234,7 +234,7 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Suppress instances that have no surface area.')
 
 toolset.registerKernelMenuButton(
@@ -244,7 +244,7 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Suppress instances that have no volume.')
 
 toolset.registerKernelMenuButton(
@@ -254,7 +254,7 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Resume suppressed instances and suppress active instances.')
 
 toolset.registerKernelMenuButton(
@@ -264,7 +264,7 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Resume suppressed instances.')
 
 menu.pop()
@@ -284,7 +284,7 @@ toolset.registerGuiMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Graphically select instances to hide from the assembly.' \
                 ' See also: right-click menu, Hide Instance.'
         )
@@ -300,7 +300,7 @@ toolset.registerGuiMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Hide visible instances and show hidden instances.'
         )
 
@@ -311,7 +311,7 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Show hidden instances and hide shown instances.')
 
 toolset.registerKernelMenuButton(
@@ -321,7 +321,7 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Show all hidden instances.')
 
 menu.pop()

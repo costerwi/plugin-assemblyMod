@@ -113,8 +113,7 @@ def instance_suppress(instances):
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
-    print("{}/{} instances selected for suppression.".format(
-        len(instances), len(ra.instances)))
+    print("{} instances suppressed.".format(len(instances)))
     ra.suppressFeatures([inst.name for inst in instances])
 
 
@@ -203,8 +202,7 @@ def instance_hide(instances):
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
-    print("{}/{} instances hidden.".format(
-        len(instances), len(ra.instances)))
+    print("{} instances hidden.".format(len(instances)))
     vp.assemblyDisplay.hideInstances([inst.name for inst in instances])
 
 

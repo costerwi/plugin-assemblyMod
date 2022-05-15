@@ -122,7 +122,7 @@ def instance_suppress_part(instances):
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
-    parts = set([inst.part.name for inst in instances]) # set of part names
+    parts = {inst.part.name for inst in instances if hasattr(inst, 'part')} # set of part names
     suppress = []
     for inst in ra.instances.values():
         if not hasattr(inst, 'part'):
@@ -211,7 +211,7 @@ def instance_hide_part(instances):
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
-    parts = set([inst.part.name for inst in instances]) # set of part names
+    parts = {inst.part.name for inst in instances if hasattr(inst, 'part')} # set of part names
     hide = []
     for inst in ra.instances.values():
         if not hasattr(inst, 'part'):

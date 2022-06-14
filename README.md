@@ -1,13 +1,13 @@
 # plugin-assemblyMod
 Abaqus/CAE plugins to work with Parts and their Instances
 
-## Assembly module plugins
+### Assembly module plugins
 
 - Instances
   - **Find duplicate parts** - Use mass properties to automatically identify and replace instances of similar parts with multiple instances of one part. Two parts must have the same mass, area, and primary moments of inertia within 0.01% to be recognized as equal.
   - **Pick Duplicate Parts...** - Graphically select instances to replace with a common part. Replacement will not happen if mass properties are significantly different from each other. Two parts must have the same mass, area, and primary moments of inertia within 1% to be recognized as equal.
-  - **Reposition using 2 csys...** - Reposition instances based on selected source and destination csys.
-  - **Rename using part name** - Update instance names using part name as a base.
+  - **Reposition using 2 csys...** - Reposition instances based on selected source and destination csys. Similar to HM position command.
+  - **Rename using part name** - Update instance names using their part name as the base.
   - Delete
     - **Hidden** - Delete instances that are currently hidden.
     - **Suppressed** - Delete instances that are currently suppressed.
@@ -28,7 +28,13 @@ Abaqus/CAE plugins to work with Parts and their Instances
   - **Edit Picked...** - Graphically select instance to edit its part.
   - **Instance unused Parts** - Instance parts that are not referenced by any instances.
 
-## Part module plugins
+### Part module plugins
 
 - **Principal mass properties** - Calculate and report principal mass properties.
 - **Report surface areas** - Calculate and report area of all named surfaces.
+
+## Installation instructions
+
+1. Download and unzip the [latest version](https://github.com/costerwi/plugin-assemblyMod/releases/latest)
+2. Double-click the included `install.cmd` or manually copy files into your abaqus_plugins directory
+3. Restart Abaqus CAE and you will find the above scripts in the Assembly module plug-ins menu

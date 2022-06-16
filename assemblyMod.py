@@ -272,10 +272,12 @@ def instance_matchname():
             continue
         if not hasattr(inst, 'part'):
             continue # skip non-part instances
-        tempName = 'temp~{}'.format(n)
-        parts.setdefault(inst.partName, []).append(tempName)
+        instName = inst.name
+        partName = inst.partName
+        tempName = 'temp~{}-{}'.format(n, instName)
         try:
             ra.features.changeKey(fromName=inst.name, toName=tempName)
+            parts.setdefault(partName, []).append( (instName, tempName) )
         except ValueError as e:
             print("Warning: {!s}".format(e))
     print("{} unique parts in {} instances.".format(
@@ -284,22 +286,27 @@ def instance_matchname():
     newNames = {}   # Dict of new names to fix Loads, BCs, interations, etc.
     for partName, instNames in parts.items():
         if 1 == len(instNames):
-            instName = instNames[0]
+            instName, tempName = instNames[0]
             toName = newNames.setdefault(instName, partName)    # no number necessary
             try:
-                ra.features.changeKey(fromName=instName, toName=toName)
+                ra.features.changeKey(fromName=tempName, toName=toName)
             except ValueError as e:
+                del newNames[instName]
                 print("Warning: {!s}".format(e))
         else:
             nDigits = 1 + int(log10(len(instNames)))
-            for n, instName in enumerate(sorted(instNames)):    # number each instance
+            for n, (instName, tempName) in enumerate(sorted(instNames)):    # number each instance
                 toName = newNames.setdefault(instName, "{0}-{1:0{2}}".format(
                     partName, n + 1, nDigits))
                 try:
-                    ra.features.changeKey(fromName=instName, toName=toName)
+                    ra.features.changeKey(fromName=tempName, toName=toName)
                 except ValueError as e:
+                    del newNames[instName]
                     print("Warning: {!s}".format(e))
-    # TODO: seek out and fix Loads, BCs, interactions, etc.
+    for sets in ra.sets.values(), ra.allInternalSets.values():
+        for s in sets:
+            pass
+            # TODO: seek out and fix Loads, BCs, interactions, etc.
 
 
 def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):

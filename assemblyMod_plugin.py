@@ -162,9 +162,15 @@ class InstanceEditPicked(InstanceSelectProcedure):
     """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
     pass
 
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|Group by size',
+        moduleName='assemblyMod',
+        functionName='instance_groupBySize()',
         author='Carl Osterwisch',
         version=str(__version__),
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        applicableModules=['Assembly', 'Interaction', 'Load'],
+        description='Group Instances according to size of parts.')
 
 # {{{1 ASSEMBLY INSTANCES DELETE
 

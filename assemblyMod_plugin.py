@@ -158,20 +158,6 @@ toolset.registerKernelMenuButton(
         applicableModules=['Assembly'],
         description='Update instance names using part name as a base.')
 
-class InstanceEditPicked(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
-
-toolset.registerKernelMenuButton(
-        buttonText='|'.join(menu) + '|Group by size',
-        moduleName='assemblyMod',
-        functionName='instance_groupBySize()',
-        author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly', 'Interaction', 'Load'],
-        description='Group Instances according to size of parts.')
-
 # {{{1 ASSEMBLY INSTANCES DELETE
 
 menu.append('&Delete')
@@ -346,6 +332,10 @@ toolset.registerKernelMenuButton(
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
         applicableModules=['Assembly'],
         description='Remove parts that are not referenced by any instances.')
+
+class InstanceEditPicked(InstanceSelectProcedure):
+    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
+    pass
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Edit Picked...',

@@ -262,7 +262,7 @@ def instance_reposition(instances, sourceCsys, destinationCsys):
 def instance_matchname():
     " Called by Abaqus/CAE plugin to rename instances based on part names "
     from math import log10
-    from abaqus import session
+    from abaqus import session, AbaqusException
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
 
@@ -278,8 +278,8 @@ def instance_matchname():
         try:
             ra.features.changeKey(fromName=inst.name, toName=tempName)
             parts.setdefault(partName, []).append( (instName, tempName) )
-        except ValueError as e:
-            print("Warning: {!s}".format(e))
+        except (ValueError, AbaqusException) as e:
+            print("Warning: {} {!s}".format(inst.name, e))
     print("{} unique parts in {} instances.".format(
         len(parts), len(ra.instances)))
 

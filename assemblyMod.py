@@ -262,7 +262,8 @@ def instance_reposition(instances, sourceCsys, destinationCsys):
 def instance_matchname():
     " Called by Abaqus/CAE plugin to rename instances based on part names "
     from math import log10
-    from abaqus import session, AbaqusException
+    from abaqus import session, mdb, AbaqusException
+    import inspect
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
 
@@ -285,28 +286,44 @@ def instance_matchname():
 
     newNames = {}   # Dict of new names to fix Loads, BCs, interations, etc.
     for partName, instNames in parts.items():
-        if 1 == len(instNames):
-            instName, tempName = instNames[0]
-            toName = newNames.setdefault(instName, partName)    # no number necessary
+        nDigits = 1 + int(log10(len(instNames)))
+        for n, (instName, tempName) in enumerate(sorted(instNames)):    # number each instance
+            if 1 == len(instNames):
+                toName = partName    # no number necessary
+            else:
+                toName = "{0}-{1:0{2}}".format(partName, n + 1, nDigits)
             try:
                 ra.features.changeKey(fromName=tempName, toName=toName)
-            except ValueError as e:
-                del newNames[instName]
-                print("Warning: {!s}".format(e))
-        else:
-            nDigits = 1 + int(log10(len(instNames)))
-            for n, (instName, tempName) in enumerate(sorted(instNames)):    # number each instance
-                toName = newNames.setdefault(instName, "{0}-{1:0{2}}".format(
-                    partName, n + 1, nDigits))
-                try:
-                    ra.features.changeKey(fromName=tempName, toName=toName)
-                except ValueError as e:
-                    del newNames[instName]
-                    print("Warning: {!s}".format(e))
-    for sets in ra.sets.values(), ra.allInternalSets.values():
-        for s in sets:
-            pass
-            # TODO: seek out and fix Loads, BCs, interactions, etc.
+                newNames[instName] = toName
+            except (ValueError, AbaqusException) as e:
+                print("Warning: {} {!s}".format(tempName, e))
+
+    # Find and update Regions which refer to the old instance names
+    model = mdb.models[ra.modelName]
+    regionTypes = {1: 'sets', 9: 'surfaces'}
+    for _, repository in inspect.getmembers(model, lambda m: type(m) == type(model.loads)):
+        for feature in repository.values():
+            updates = {}
+            for attr, value in inspect.getmembers(feature, lambda m: isinstance(m, tuple)):
+                if attr.startswith('_'):
+                    continue # skip private members
+                if not 6 == len(value): # instance regions have length 6
+                    continue
+                setName, partName, instName, regionSpace, regionType, internal = value
+                newInstName = newNames.get(instName)
+                if not newInstName:
+                    continue # this was not a renamed instance
+                if not regionType in regionTypes:
+                    print('Warning:', feature.name, attr, 'unknown region type', regionType)
+                    continue
+                inst = ra.instances[newInstName]
+                collector = getattr(inst, regionTypes[regionType])
+                if setName in collector.keys():
+                    updates[attr] = collector[setName]
+                else:
+                    print('Warning:', feature.name, attr, inst.name, 'missing', regionTypes[regionType], setName)
+            if updates:
+                feature.setValues(**updates)
 
 
 def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):

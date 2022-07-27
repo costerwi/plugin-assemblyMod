@@ -273,6 +273,8 @@ def instance_matchname():
             continue
         if not hasattr(inst, 'part'):
             continue # skip non-part instances
+        if not ra.modelName == inst.modelName:
+            continue # skip model instances
         instName = inst.name
         partName = inst.partName
         tempName = 'temp~{}-{}'.format(n, instName)
@@ -300,30 +302,38 @@ def instance_matchname():
 
     # Find and update Regions which refer to the old instance names
     model = mdb.models[ra.modelName]
-    regionTypes = {1: 'sets', 9: 'surfaces'}
-    for _, repository in inspect.getmembers(model, lambda m: type(m) == type(model.loads)):
-        for feature in repository.values():
+    repoType = type(model.loads)
+
+    def recursiveSearch(repository):
+        """Search each object in repository for regions referring to renamed instances"""
+        regionTypes = {1: 'sets', 9: 'surfaces'}
+        for obj in repository.values():
             updates = {}
-            for attr, value in inspect.getmembers(feature, lambda m: isinstance(m, tuple)):
+            for attr, value in inspect.getmembers(obj):
                 if attr.startswith('_'):
                     continue # skip private members
-                if not 6 == len(value): # instance regions have length 6
-                    continue
-                setName, partName, instName, regionSpace, regionType, internal = value
-                newInstName = newNames.get(instName)
-                if not newInstName:
-                    continue # this was not a renamed instance
-                if not regionType in regionTypes:
-                    print('Warning:', feature.name, attr, 'unknown region type', regionType)
-                    continue
-                inst = ra.instances[newInstName]
-                collector = getattr(inst, regionTypes[regionType])
-                if setName in collector.keys():
-                    updates[attr] = collector[setName]
-                else:
-                    print('Warning:', feature.name, attr, inst.name, 'missing', regionTypes[regionType], setName)
+                if type(value) == repoType:
+                    recursiveSearch(value) # also search this repository
+                elif isinstance(value, tuple) and 6 == len(value): # instance regions have length 6
+                    setName, partName, instName, regionSpace, regionType, internal = value
+                    newInstName = newNames.get(instName)
+                    if not newInstName:
+                        continue # this was not a renamed instance
+                    if not regionType in regionTypes:
+                        print('Warning:', obj.name, attr, 'unknown region type', regionType)
+                        continue
+                    inst = ra.instances[newInstName]
+                    collector = getattr(inst, regionTypes[regionType]) # sets or surfaces
+                    if setName in collector.keys():
+                        updates[attr] = collector[setName]
+                    else:
+                        print('Warning:', obj.name, attr, inst.name, 'missing', regionTypes[regionType], setName)
             if updates:
-                feature.setValues(**updates)
+                obj.setValues(**updates)
+
+    # Start searching from repositories which are members of the model
+    for _, repository in inspect.getmembers(model, lambda m: type(m) == repoType):
+        recursiveSearch(repository)
 
 
 def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):
@@ -372,11 +382,14 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
     vp.disableColorCodeUpdates()
     count = 0
     t0 = time()
-    for inst in sorted(instances, reverse=True, key=lambda i: popularity[i.name]):
+    for inst in sorted(
+            filter(lambda i: hasattr(i, 'part'), instances),
+            reverse=True,
+            key=lambda i: popularity[i.name] + len(i.nodes) + len(i.surfaces) + len(i.sets)):
         if ra.features[inst.name].isSuppressed():
             continue # skip suppressed instances
-        if not hasattr(inst, 'part'):
-            continue # skip non-part instances
+        if not model.name == inst.modelName:
+            continue # skip model instances
         if not inst.dependent:
             continue # skip independent instances
         properties = partProperties.setdefault(inst.part.name, {})

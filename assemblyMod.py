@@ -273,6 +273,8 @@ def instance_matchname():
             continue
         if not hasattr(inst, 'part'):
             continue # skip non-part instances
+        if not ra.modelName == inst.modelName:
+            continue # skip model instances
         instName = inst.name
         partName = inst.partName
         tempName = 'temp~{}-{}'.format(n, instName)
@@ -386,8 +388,8 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
             key=lambda i: popularity[i.name] + len(i.nodes) + len(i.surfaces) + len(i.sets)):
         if ra.features[inst.name].isSuppressed():
             continue # skip suppressed instances
-        if not hasattr(inst, 'part'):
-            continue # skip non-part instances
+        if not model.name == inst.modelName:
+            continue # skip model instances
         if not inst.dependent:
             continue # skip independent instances
         properties = partProperties.setdefault(inst.part.name, {})

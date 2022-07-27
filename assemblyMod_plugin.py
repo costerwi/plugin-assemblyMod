@@ -2,7 +2,7 @@
 
 Carl Osterwisch <costerwi@gmail.com> November 2013
 """
-__version__ = "0.8.0"
+__version__ = "0.8.1"
 
 from abaqusGui import *
 

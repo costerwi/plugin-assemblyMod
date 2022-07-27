@@ -380,7 +380,10 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
     vp.disableColorCodeUpdates()
     count = 0
     t0 = time()
-    for inst in sorted(instances, reverse=True, key=lambda i: popularity[i.name]):
+    for inst in sorted(
+            filter(lambda i: hasattr(i, 'part'), instances),
+            reverse=True,
+            key=lambda i: popularity[i.name] + len(i.nodes) + len(i.surfaces) + len(i.sets)):
         if ra.features[inst.name].isSuppressed():
             continue # skip suppressed instances
         if not hasattr(inst, 'part'):

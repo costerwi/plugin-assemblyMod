@@ -1,5 +1,5 @@
 # plugin-assemblyMod
-Abaqus/CAE plugins to work with Parts and their Instances
+This is a collection of Abaqus/CAE plugins to help work with Parts and their Instances, especially in large imported assemblies.
 
 ### Assembly module plugins
 
@@ -7,7 +7,7 @@ Abaqus/CAE plugins to work with Parts and their Instances
   - **Find duplicate parts** - Use mass properties to automatically identify and replace instances of similar parts with multiple instances of one part. Two parts must have the same mass, area, and primary moments of inertia within 0.01% to be recognized as equal.
   - **Pick Duplicate Parts...** - Graphically select instances to replace with a common part. Replacement will not happen if mass properties are significantly different from each other. Two parts must have the same mass, area, and primary moments of inertia within 1% to be recognized as equal.
   - **Reposition using 2 csys...** - Reposition instances based on selected source and destination csys. Similar to HM position command.
-  - **Rename using part name** - Update instance names using their part name as the base.
+  - **Rename using part name** - Update instance names using their part name as the base. This also searches for an updates regions which refer to the renamed instances, such as Constraints.
   - Delete
     - **Hidden** - Delete instances that are currently hidden.
     - **Suppressed** - Delete instances that are currently suppressed.

@@ -269,8 +269,6 @@ def instance_matchname():
 
     parts = {}  # Identify unique parts and their instances
     for n, inst in enumerate(ra.instances.values()):
-        if ra.features[inst.name].isSuppressed():
-            continue
         if not hasattr(inst, 'part'):
             continue # skip non-part instances
         if not ra.modelName == inst.modelName:
@@ -333,6 +331,9 @@ def instance_matchname():
 
     # Start searching from repositories which are members of the model
     for _, repository in inspect.getmembers(model, lambda m: type(m) == repoType):
+        recursiveSearch(repository)
+    for _, repository in inspect.getmembers(model.rootAssembly.engineeringFeatures,
+            lambda m: type(m) == repoType):
         recursiveSearch(repository)
 
 

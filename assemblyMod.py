@@ -332,6 +332,9 @@ def instance_matchname():
     # Start searching from repositories which are members of the model
     for _, repository in inspect.getmembers(model, lambda m: type(m) == repoType):
         recursiveSearch(repository)
+    for _, repository in inspect.getmembers(model.rootAssembly.engineeringFeatures,
+            lambda m: type(m) == repoType):
+        recursiveSearch(repository)
 
 
 def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):

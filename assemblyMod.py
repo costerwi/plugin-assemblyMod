@@ -269,8 +269,6 @@ def instance_matchname():
 
     parts = {}  # Identify unique parts and their instances
     for n, inst in enumerate(ra.instances.values()):
-        if ra.features[inst.name].isSuppressed():
-            continue
         if not hasattr(inst, 'part'):
             continue # skip non-part instances
         if not ra.modelName == inst.modelName:

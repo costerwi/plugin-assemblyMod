@@ -243,7 +243,7 @@ def instance_hide_showAll():
 
 # {{{1 ASSEMBLY INSTANCES
 
-def instance_reposition(instances, sourceCsys, destinationCsys):
+def instance_reposition_csys(instances, sourceCsys, destinationCsys):
     " Reposition instances based on source and destination datum csys "
     translation = np.asarray(destinationCsys.origin.pointOn) - sourceCsys.origin.pointOn
     R1 = ARotation.from_csys(sourceCsys)
@@ -363,6 +363,38 @@ def instance_rename(newNames, ra=None):
     model = mdb.models[ra.modelName]
     recursiveSearch(model)
     return renamed # renamed[oldName] = newName
+
+
+def instance_moveTo(instance, position):
+    """Move instance to a specific point in space"""
+    from numpy import asarray
+    from abaqus import session
+    if isinstance(instance, str):
+        vp = session.viewports[session.currentViewportName]
+        ra = vp.displayedObject # rootAssembly
+        instance = ra.instances[instance]
+    instance.translate(asarray(position) - instance.getTranslation())
+
+
+def instance_rotateTo(instance, rotation):
+    """Rotate instance to a specific direction in space"""
+    import numpy as np
+    from abaqus import session
+    if isinstance(instance, str):
+        vp = session.viewports[session.currentViewportName]
+        ra = vp.displayedObject # rootAssembly
+        instance = ra.instances[instance]
+    rotNew = ARotation.from_rotvec(np.radians(rotation))
+    point, direction, deg = instance.getRotation()
+    rotOld = ARotation.from_rotvec(np.asarray(direction)*np.radians(deg))
+    diff = rotNew*(rotOld.inv()) # calculate difference
+    axisDirection, theta = diff.as_axisAngle()
+    print(axisDirection, theta)
+    instance.rotateAboutAxis(
+            axisPoint=instance.getTranslation(),  # rotate about the instance origin
+            axisDirection=axisDirection,
+            angle=np.rad2deg(theta),
+            )
 
 
 def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):

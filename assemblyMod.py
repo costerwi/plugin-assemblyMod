@@ -314,20 +314,28 @@ def instance_rename(newNames, ra=None):
         except (ValueError, AbaqusException) as e:
             print("Warning: {} {!s}".format(instName, e))
 
-    model = mdb.models[ra.modelName]
-    repoType = type(model.loads)
-    def recursiveSearch(repository):
-        """Search each object in repository for regions referring to renamed instances"""
+    def recursiveSearch(obj):
+        """Search each member of obj for regions referring to renamed instances"""
         regionTypes = {1: 'sets', 9: 'surfaces'}
-        for obj in repository.values():
-            updates = {}
-            for attr, value in inspect.getmembers(obj):
-                if attr.startswith('_'):
-                    continue # skip private members
-                if type(value) == repoType:
-                    recursiveSearch(value) # also search this repository
-                elif isinstance(value, tuple) and 6 == len(value): # instance regions have length 6
-                    setName, partName, instName, regionSpace, regionType, internal = value
+        updates = {}
+        for attr in dir(obj):
+            if attr.startswith('_'):
+                continue # skip private members
+            try:
+                member = getattr(obj, attr)
+            except Exception as e:
+                continue  # ignore errors
+            if callable(member):
+                continue  # skip methods
+            if not member:
+                continue  # skip falsy members
+            if hasattr(member, 'getId'):
+                continue  # skip symbolic constants
+            if isinstance(member, (int, float, str, dict, list)):
+                continue  # skip builtin types
+            if isinstance(member, tuple):
+                if 6 == len(member): # instance regions have length 6
+                    setName, partName, instName, regionSpace, regionType, internal = member
                     newInstName = renamed.get(instName)
                     if not newInstName:
                         continue # this was not a renamed instance
@@ -340,15 +348,17 @@ def instance_rename(newNames, ra=None):
                         updates[attr] = collector[setName]
                     else:
                         print('Warning:', obj.name, attr, inst.name, 'missing', regionTypes[regionType], setName)
-            if updates:
-                obj.setValues(**updates)
+            elif hasattr(member, 'values'):
+                for repovalue in member.values():
+                    recursiveSearch(repovalue) # search each value in repo
+            else:
+                recursiveSearch(member)
+        if updates and hasattr(obj, 'setValues'):
+            obj.setValues(**updates)
 
-    # Start searching from repositories which are members of the model
-    for _, repository in inspect.getmembers(model, lambda m: type(m) == repoType):
-        recursiveSearch(repository)
-    for _, repository in inspect.getmembers(model.rootAssembly.engineeringFeatures,
-            lambda m: type(m) == repoType):
-        recursiveSearch(repository)
+    # Search for matching regions in all members of the model
+    model = mdb.models[ra.modelName]
+    recursiveSearch(model)
     return renamed # renamed[oldName] = newName
 
 

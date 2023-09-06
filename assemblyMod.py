@@ -263,58 +263,80 @@ def instance_matchname():
     " Called by Abaqus/CAE plugin to rename instances based on part names "
     from math import log10
     from abaqus import session, mdb, AbaqusException
-    import inspect
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
 
-    parts = {}  # Identify unique parts and their instances
+    tempNames = {}
     for n, inst in enumerate(ra.instances.values()):
         if not hasattr(inst, 'part'):
             continue # skip non-part instances
         if not ra.modelName == inst.modelName:
             continue # skip model instances
         instName = inst.name
-        partName = inst.partName
-        tempName = 'temp~{}-{}'.format(n, instName)
-        try:
-            ra.features.changeKey(fromName=inst.name, toName=tempName)
-            parts.setdefault(partName, []).append( (instName, tempName) )
-        except (ValueError, AbaqusException) as e:
-            print("Warning: {} {!s}".format(inst.name, e))
-    print("{} unique parts in {} instances.".format(
-        len(parts), len(ra.instances)))
+        tempNames[instName] = 'temp~{}-{}'.format(n, instName)
+    tempNames = instance_rename(newNames=tempNames, ra=ra)
 
-    newNames = {}   # Dict of new names to fix Loads, BCs, interations, etc.
+    parts = {}  # Identify unique parts and their instances
+    for instName in tempNames.values():
+        inst = ra.instances[instName]
+        parts.setdefault(inst.part.name, []).append(instName)
+
+    print("{} unique parts in {} instances.".format(
+        len(parts), len(tempNames)))
+
+    newNames = {}   # Dict of proposed name changes
     for partName, instNames in parts.items():
         nDigits = 1 + int(log10(len(instNames)))
-        for n, (instName, tempName) in enumerate(sorted(instNames)):    # number each instance
+        for n, instName in enumerate(sorted(instNames)):    # number each instance
             if 1 == len(instNames):
-                toName = partName    # no number necessary
+                newNames[instName] = partName    # no number necessary
             else:
-                toName = "{0}-{1:0{2}}".format(partName, n + 1, nDigits)
-            try:
-                ra.features.changeKey(fromName=tempName, toName=toName)
-                newNames[instName] = toName
-            except (ValueError, AbaqusException) as e:
-                print("Warning: {} {!s}".format(tempName, e))
+                newNames[instName] = "{0}-{1:0{2}}".format(partName, n + 1, nDigits)
+    instance_rename(newNames=newNames, ra=ra)
+
+
+def instance_rename(newNames, ra=None):
+    """Rename instances and correct any references to their regions"""
+
+    from abaqus import session, mdb, AbaqusException
+    import inspect
 
     # Find and update Regions which refer to the old instance names
-    model = mdb.models[ra.modelName]
-    repoType = type(model.loads)
+    if not ra:
+        vp = session.viewports[session.currentViewportName]
+        ra = vp.displayedObject # rootAssembly
 
-    def recursiveSearch(repository):
-        """Search each object in repository for regions referring to renamed instances"""
+    renamed = {} # dict of successful name changes
+    for instName, toName in newNames.items():
+        try:
+            ra.features.changeKey(fromName=instName, toName=toName)
+            renamed[instName] = toName
+        except (ValueError, AbaqusException) as e:
+            print("Warning: {} {!s}".format(instName, e))
+
+    def recursiveSearch(obj):
+        """Search each member of obj for regions referring to renamed instances"""
         regionTypes = {1: 'sets', 9: 'surfaces'}
-        for obj in repository.values():
-            updates = {}
-            for attr, value in inspect.getmembers(obj):
-                if attr.startswith('_'):
-                    continue # skip private members
-                if type(value) == repoType:
-                    recursiveSearch(value) # also search this repository
-                elif isinstance(value, tuple) and 6 == len(value): # instance regions have length 6
-                    setName, partName, instName, regionSpace, regionType, internal = value
-                    newInstName = newNames.get(instName)
+        updates = {}
+        for attr in dir(obj):
+            if attr.startswith('_'):
+                continue # skip private members
+            try:
+                member = getattr(obj, attr)
+            except Exception as e:
+                continue  # ignore errors
+            if callable(member):
+                continue  # skip methods
+            if not member:
+                continue  # skip falsy members
+            if hasattr(member, 'getId'):
+                continue  # skip symbolic constants
+            if isinstance(member, (int, float, str, dict, list)):
+                continue  # skip builtin types
+            if isinstance(member, tuple):
+                if 6 == len(member): # instance regions have length 6
+                    setName, partName, instName, regionSpace, regionType, internal = member
+                    newInstName = renamed.get(instName)
                     if not newInstName:
                         continue # this was not a renamed instance
                     if not regionType in regionTypes:
@@ -326,15 +348,21 @@ def instance_matchname():
                         updates[attr] = collector[setName]
                     else:
                         print('Warning:', obj.name, attr, inst.name, 'missing', regionTypes[regionType], setName)
-            if updates:
+            elif hasattr(member, 'values'):
+                for repovalue in member.values():
+                    recursiveSearch(repovalue) # search each value in repo
+            else:
+                recursiveSearch(member)
+        if updates and hasattr(obj, 'setValues'):
+            try:
                 obj.setValues(**updates)
+            except (ValueError, AbaqusException) as e:
+                print("Warning: {} {!s}".format(obj.name, e))
 
-    # Start searching from repositories which are members of the model
-    for _, repository in inspect.getmembers(model, lambda m: type(m) == repoType):
-        recursiveSearch(repository)
-    for _, repository in inspect.getmembers(model.rootAssembly.engineeringFeatures,
-            lambda m: type(m) == repoType):
-        recursiveSearch(repository)
+    # Search for matching regions in all members of the model
+    model = mdb.models[ra.modelName]
+    recursiveSearch(model)
+    return renamed # renamed[oldName] = newName
 
 
 def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):

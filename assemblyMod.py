@@ -354,7 +354,10 @@ def instance_rename(newNames, ra=None):
             else:
                 recursiveSearch(member)
         if updates and hasattr(obj, 'setValues'):
-            obj.setValues(**updates)
+            try:
+                obj.setValues(**updates)
+            except (ValueError, AbaqusException) as e:
+                print("Warning: {} {!s}".format(obj.name, e))
 
     # Search for matching regions in all members of the model
     model = mdb.models[ra.modelName]

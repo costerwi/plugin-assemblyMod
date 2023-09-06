@@ -2,7 +2,7 @@
 
 Carl Osterwisch <costerwi@gmail.com> November 2013
 """
-__version__ = "0.8.2"
+__version__ = "0.8.3"
 
 from abaqusGui import *
 
@@ -42,7 +42,7 @@ class InstanceSelectProcedure(AFXProcedure):
                 sequenceStyle=TUPLE)    # TUPLE or ARRAY
 
 
-class instanceRepositionProcedure(AFXProcedure):
+class instanceRepositionCsysProcedure(AFXProcedure):
     "Class to start the instance selection procedure"
 
     def __init__(self, owner):
@@ -50,7 +50,7 @@ class instanceRepositionProcedure(AFXProcedure):
 
         # Command
         instance_cmd = AFXGuiCommand(mode=self,
-                method='instance_reposition',
+                method='instance_reposition_csys',
                 objectName='assemblyMod',
                 registerQuery=FALSE)
 
@@ -139,7 +139,7 @@ toolset.registerGuiMenuButton(
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Reposition using 2 csys...',
-        object=instanceRepositionProcedure(toolset),
+        object=instanceRepositionCsysProcedure(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=str(__version__),

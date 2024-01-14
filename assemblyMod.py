@@ -289,6 +289,38 @@ def instance_matchname():
     instance_rename(newNames=newNames, ra=ra)
 
 
+def instanceRenameSearch(search, replace=''):
+    """Rename according to regular expression sub"""
+    import re
+    from abaqus import session, mdb, AbaqusException
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+
+    baseNames=[]
+    unique={}
+    for inst in ra.instances.values():
+        if ra.features[inst.name].isSuppressed():
+            continue # skip suppressed instances
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if not ra.modelName == inst.modelName:
+            continue # skip model instances
+        baseName = re.sub(search, replace, inst.name)
+        baseNames.append( (inst.name, baseName) )
+        unique.setdefault(baseName, []).append(inst.name)
+
+    newNames=[]
+    for instName, baseName in baseNames:
+        instList = unique[baseName]
+        newName = baseName
+        if len(instList) > 1:
+            n = instList.index(instName) + 1
+            newName += str(-1 * n)
+        newNames.append( (instName, newName) )
+
+    newNames = instance_rename(newNames=newNames, ra=ra)
+
+
 def instance_rename(newNames, ra):
     """Rename instances and correct any references to their regions"""
 

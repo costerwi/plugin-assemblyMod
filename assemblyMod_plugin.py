@@ -99,6 +99,44 @@ class instanceRepositionCsysProcedure(AFXProcedure):
         return None # no more steps
 
 
+class InstanceRenameProcedure(AFXProcedure):
+    class Dialog1(AFXDataDialog):
+        def __init__(self, procedure):
+            AFXDataDialog.__init__(
+                self, procedure, 'Rename Instances',
+                self.OK|self.CANCEL, DIALOG_NORMAL|DECOR_RESIZE,
+                )
+            p = AFXVerticalAligner(self, opts=LAYOUT_FILL_X)
+            AFXTextField(p, 20, 'Search',
+                procedure.searchKw,
+                opts=LAYOUT_FILL_X)
+            AFXTextField(p, 20, 'Replace',
+                procedure.replaceKw,
+                opts=LAYOUT_FILL_X)
+
+    def __init__(self, owner):
+        AFXProcedure.__init__(self, owner) # Construct the base class.
+        command = AFXGuiCommand(mode=self,
+                method='instanceRenameSearch',
+                objectName='assemblyMod',
+                registerQuery=FALSE)
+        self.searchKw = AFXStringKeyword(
+                command=command,
+                name='search',
+                isRequired=TRUE)
+        self.replaceKw = AFXStringKeyword(
+                command=command,
+                name='replace',
+                isRequired=TRUE)
+
+    def getFirstStep(self):
+        return AFXDialogStep(
+            owner=self,
+            dialog=self.Dialog1(self),
+            prompt='Enter search and replace text strings or regular expressions',
+            )
+
+
 ###########################################################################
 # Register the plugins
 ###########################################################################
@@ -157,6 +195,17 @@ toolset.registerKernelMenuButton(
         helpUrl='https://github.com/costerwi/plugin-assemblyMod',
         applicableModules=['Assembly'],
         description='Update instance names using part name as a base.')
+
+toolset.registerGuiMenuButton(
+        buttonText='|'.join(menu) + '|&Rename using search/replace...',
+        object=InstanceRenameProcedure(toolset),
+        kernelInitString='import assemblyMod',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        applicableModules=['Assembly'],
+        description='Rename instances using specified criteria'
+        )
 
 # {{{1 ASSEMBLY INSTANCES DELETE
 

@@ -5,7 +5,7 @@ vp = session.viewports[session.currentViewportName]
 ra = vp.displayedObject # should be in Assembly module
 model = mdb.models[ra.modelName]
 
-for surfName, surf in ra.surfaces.items(): # loop through all assembly surfaces
+for surfName, surf in list(ra.surfaces.items()): # loop through all assembly surfaces
     if len(surf.edges):
         print('Skipping', surfName, 'which contains edges.')
 
@@ -30,16 +30,16 @@ for surfName, surf in ra.surfaces.items(): # loop through all assembly surfaces
             i = instFaces.setdefault(elem.instanceName, {})
             i.setdefault(side, []).append(elem.label) # group by face number
 
-    for instName, faces in instFaces.items():
+    for instName, faces in list(instFaces.items()):
         inst = ra.instances[instName]
         if inst.dependent:
             inst = inst.part
-        if surfName in inst.surfaces.keys():
+        if surfName in list(inst.surfaces.keys()):
             print(surfName, 'already exists in', inst.name)
             continue
 
         elements = {}
-        for side, faceList in faces.items():
+        for side, faceList in list(faces.items()):
             if side in (FACE1, FACE2, FACE3, FACE4, FACE5, FACE6):
                 # convert list of element ids to part MeshElementArray
                 elements[side] = inst.elements.sequenceFromLabels(faceList)
@@ -73,10 +73,10 @@ for surfName, surf in ra.surfaces.items(): # loop through all assembly surfaces
                 ref.setValues(**keywords)
 
         # Search and replace old surface with new surface everywhere
-        for load in model.loads.values():
+        for load in list(model.loads.values()):
             replace(load)
 
-        for constraint in model.constraints.values():
+        for constraint in list(model.constraints.values()):
             replace(constraint)
 
         del ra.surfaces[surfName]

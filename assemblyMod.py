@@ -239,7 +239,7 @@ def instance_hide_showAll():
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
-    vp.assemblyDisplay.setValues( visibleInstances=ra.instances.keys() )
+    vp.assemblyDisplay.setValues( visibleInstances=list(ra.instances.keys()) )
 
 # {{{1 ASSEMBLY INSTANCES
 
@@ -261,63 +261,122 @@ def instance_reposition_csys(instances, sourceCsys, destinationCsys):
 
 def instance_matchname():
     " Called by Abaqus/CAE plugin to rename instances based on part names "
-    from math import log10
     from abaqus import session, mdb, AbaqusException
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
 
-    tempNames = {}
-    for n, inst in enumerate(ra.instances.values()):
+    parts = {}
+    for inst in ra.instances.values():
+        if ra.features[inst.name].isSuppressed():
+            continue # skip suppressed instances
         if not hasattr(inst, 'part'):
             continue # skip non-part instances
         if not ra.modelName == inst.modelName:
             continue # skip model instances
-        instName = inst.name
-        tempNames[instName] = 'temp~{}-{}'.format(n, instName)
-    tempNames = instance_rename(newNames=tempNames, ra=ra)
+        parts.setdefault(inst.part.name, []).append(inst.name)
 
-    parts = {}  # Identify unique parts and their instances
-    for instName in tempNames.values():
-        inst = ra.instances[instName]
-        parts.setdefault(inst.part.name, []).append(instName)
+    newNames = []
+    for partName, instNames in parts.items():
+        for n, instName in enumerate(instNames):
+            newName = partName
+            if len(instNames) > 1:
+                newName += str(-1 - n)
+            newNames.append( (instName, newName) )
 
     print("{} unique parts in {} instances.".format(
-        len(parts), len(tempNames)))
+        len(parts), len(newNames)))
 
-    newNames = {}   # Dict of proposed name changes
-    for partName, instNames in parts.items():
-        nDigits = 1 + int(log10(len(instNames)))
-        for n, instName in enumerate(sorted(instNames)):    # number each instance
-            if 1 == len(instNames):
-                newNames[instName] = partName    # no number necessary
-            else:
-                newNames[instName] = "{0}-{1:0{2}}".format(partName, n + 1, nDigits)
     instance_rename(newNames=newNames, ra=ra)
 
 
-def instance_rename(newNames, ra=None):
+def instanceRenameSearch(search, replace=''):
+    """Rename according to regular expression sub"""
+    import re
+    from abaqus import session, mdb, AbaqusException
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+
+    baseNames=[]
+    unique={}
+    for inst in ra.instances.values():
+        if ra.features[inst.name].isSuppressed():
+            continue # skip suppressed instances
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if not ra.modelName == inst.modelName:
+            continue # skip model instances
+        baseName = re.sub(search, replace, inst.name)
+        baseNames.append( (inst.name, baseName) )
+        unique.setdefault(baseName, []).append(inst.name)
+
+    newNames=[]
+    for instName, baseName in baseNames:
+        instList = unique[baseName]
+        newName = baseName
+        if len(instList) > 1:
+            n = instList.index(instName) + 1
+            newName += str(-1 * n)
+        newNames.append( (instName, newName) )
+
+    newNames = instance_rename(newNames=newNames, ra=ra)
+
+
+def instance_rename(newNames, ra):
     """Rename instances and correct any references to their regions"""
 
     from abaqus import session, mdb, AbaqusException
     import inspect
 
-    # Find and update Regions which refer to the old instance names
-    if not ra:
-        vp = session.viewports[session.currentViewportName]
-        ra = vp.displayedObject # rootAssembly
+    if False:
+        # Search general contact surfaces
+        # In 2023 there is no easy way to know if an intance is referenced in general contact
+        model.keywordBlock.synchVersions(storeNodesAndElements=False)
+        for sie in model.keywordBlock.sieBlocks:
+            if sie.startswith('*Contact Initialization Assignment'):
+                for n, dataline in enumerate(sie.replace('"', '').split('\n')[1:]):
+                    sp = dataline.split(',')
+                    # TODO store this data to later check for renamed instance
 
-    renamed = {} # dict of successful name changes
-    for instName, toName in newNames.items():
-        try:
-            ra.features.changeKey(fromName=instName, toName=toName)
-            renamed[instName] = toName
-        except (ValueError, AbaqusException) as e:
-            print("Warning: {} {!s}".format(instName, e))
+    def rename(newNames):
+        """Rename assembly features
+        newNames is a list of (fromName, toName) pairs
+        returns list of length newNames containing True and False success
+        """
+        success = [] # list of success with changing names
+        for fromName, toName in newNames:
+            if toName is not fromName:
+                try:
+                    ra.features.changeKey(fromName=fromName, toName=toName)
+                    success.append(True)
+                    continue
+                except (ValueError, AbaqusException) as e:
+                    print("Warning: {} {!s}".format(fromName, e))
+            success.append(False)
+        return success
+
+    # To avoid conflicts, first rename all instances using temporary names
+    table = [(old, 'Rename~' + old, new) for old, new in newNames]
+    goodList = rename([(old, temp) for old, temp, new in table])
+    table = [row for row, good in zip(table, goodList) if good] # only continue with successes
+
+    # Next rename temporary names to the final names
+    goodList = rename([(temp, new) for old, temp, new in table])
+
+    # Failures will still have the temporary name; attempt to fix back to original name
+    fixTable = [row for row, good in zip(table, goodList) if not good]
+    fixedList = rename([(temp, old) for old, temp, new in fixTable]) # go back to original name, if possible
+    tempTable = [row for row, fixed in zip(fixTable, fixedList) if not fixed] # instances stuck with temp name
+
+    # Finally, create "renamed" list to include all successful names changes
+    table = [row for row, good in zip(table, goodList) if good] # save success
+    renamed = [(old, new) for old, temp, new in table]
+    renamed.extend([(old, temp) for old, temp, new in tempTable]) # add any failed fixes
 
     def recursiveSearch(obj):
         """Search each member of obj for regions referring to renamed instances"""
         regionTypes = {1: 'sets', 9: 'surfaces'}
         updates = {}
+        nameDict = dict(renamed)
         for attr in dir(obj):
             if attr.startswith('_'):
                 continue # skip private members
@@ -336,7 +395,7 @@ def instance_rename(newNames, ra=None):
             if isinstance(member, tuple):
                 if 6 == len(member): # instance regions have length 6
                     setName, partName, instName, regionSpace, regionType, internal = member
-                    newInstName = renamed.get(instName)
+                    newInstName = nameDict.get(instName)
                     if not newInstName:
                         continue # this was not a renamed instance
                     if not regionType in regionTypes:
@@ -359,10 +418,12 @@ def instance_rename(newNames, ra=None):
             except (ValueError, AbaqusException) as e:
                 print("Warning: {} {!s}".format(obj.name, e))
 
-    # Search for matching regions in all members of the model
-    model = mdb.models[ra.modelName]
-    recursiveSearch(model)
-    return renamed # renamed[oldName] = newName
+    if renamed:
+        # Search for matching regions in all members of the model
+        model = mdb.models[ra.modelName]
+        recursiveSearch(model)
+
+    return renamed # list of [fromName, toNamed]
 
 
 def instance_moveTo(instance, position):
@@ -408,7 +469,7 @@ def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):
         vp = session.viewports[session.currentViewportName]
         ra = vp.displayedObject # rootAssembly
     model = mdb.models[ra.modelName]
-    instances = ra.instances.values() # all instances in the assembly
+    instances = list(ra.instances.values()) # all instances in the assembly
     return instance_derefDup(instances, rtol=rtol, atol=atol)
 
 
@@ -444,7 +505,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
     count = 0
     t0 = time()
     for inst in sorted(
-            filter(lambda i: hasattr(i, 'part'), instances),
+            [i for i in instances if hasattr(i, 'part')],
             reverse=True,
             key=lambda i: popularity[i.name] + len(i.nodes) + len(i.surfaces) + len(i.sets)):
         if ra.features[inst.name].isSuppressed():
@@ -508,7 +569,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
         instRotation = ARotation.from_rotvec(np.asarray(instAxis) * np.radians(instTh))
         instCentroid = instRotation.apply(instCentroid - offset) + offset
 
-        if DEBUG and not ra.features.has_key('CG-' + inst.part.name):
+        if DEBUG and 'CG-' + inst.part.name not in ra.features:
             pt = ra.ReferencePoint(instCentroid)
             ra.features.changeKey(fromName=pt.name, toName='CG-' + inst.part.name)
 
@@ -692,7 +753,7 @@ def part_principalProperties(part = None, properties={}):
     centroid = np.asarray(properties['volumeCentroid'])
     rot = properties['principalDirections']
 
-    if part.features.has_key(_principal_csys):
+    if _principal_csys in part.features:
         del part.features[_principal_csys]
     part.DatumCsysByThreePoints(
             name=_principal_csys,

@@ -8,6 +8,7 @@ This is a collection of Abaqus/CAE plugins to help work with Parts and their Ins
   - **Pick Duplicate Parts...** - Graphically select instances to replace with a common part. Replacement will not happen if mass properties are significantly different from each other. Two parts must have the same mass, area, and primary moments of inertia within 1% to be recognized as equal.
   - **Reposition using 2 csys...** - Reposition instances based on selected source and destination csys. Similar to HM position command.
   - **Rename using part name** - Update instance names using their part name as the base. This also searches for an updates regions which refer to the renamed instances, such as Constraints.
+  - **Rename using search/replace** - Update instance names using user specified search and replace strings or regular expressions.
   - Delete
     - **Hidden** - Delete instances that are currently hidden.
     - **Suppressed** - Delete instances that are currently suppressed.
@@ -27,6 +28,7 @@ This is a collection of Abaqus/CAE plugins to help work with Parts and their Ins
   - **Delete unused Parts** - Remove parts that are not referenced by any instances.
   - **Edit Picked...** - Graphically select instance to edit its part.
   - **Instance unused Parts** - Instance parts that are not referenced by any instances.
+  - **Mesh unmeshed Parts** - Generate mesh on unmeshed Parts and Instances used in the model.
 
 ### Part module plugins
 

@@ -407,6 +407,16 @@ toolset.registerKernelMenuButton(
         applicableModules=['Assembly'],
         description='Instance parts that are not referenced by any instances.')
 
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|&Mesh unmeshed Parts',
+        moduleName='assemblyMod',
+        functionName='part_meshUsed()',
+        author='Carl Osterwisch',
+        version=str(__version__),
+        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        applicableModules=['Assembly'],
+        description='Generate mesh on unmeshed used Parts and Instances.')
+
 # {{{1 PART
 
 toolset.registerKernelMenuButton(

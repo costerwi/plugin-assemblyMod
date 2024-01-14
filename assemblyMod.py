@@ -647,6 +647,34 @@ def part_instanceUnused():
         ra.Instance(name=instName, part=model.parts[partName], dependent=True)
     print('Added {} instances'.format(len(unused)))
 
+def part_meshUsed():
+    """Generate mesh on unmeshed used Parts and Instances"""
+    from abaqus import session, mdb
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    model = mdb.models[ra.modelName]
+    usedParts = set() # set of used part names
+    independent = [] # list of independent instances
+    for inst in ra.instances.values():
+        if ra.features[inst.name].isSuppressed():
+            continue
+        if not hasattr(inst, 'part'):
+            continue
+        if inst.excludedFromSimulation:
+            continue
+        if not inst.dependent:
+            if 0 == len(inst.nodes):
+                independent.append(inst)
+            continue
+        usedParts.add(inst.partName)
+    for partName in usedParts:
+        part = model.parts[partName]
+        if len(part.nodes) > 0:
+            continue # already has some mesh
+        part.generateMesh()
+    if independent:
+        ra.generateMesh(regions=independent)
+
 # {{{1 PART
 
 def getAreaProperties(part, properties={}):

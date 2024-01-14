@@ -239,7 +239,7 @@ def instance_hide_showAll():
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
-    vp.assemblyDisplay.setValues( visibleInstances=ra.instances.keys() )
+    vp.assemblyDisplay.setValues( visibleInstances=list(ra.instances.keys()) )
 
 # {{{1 ASSEMBLY INSTANCES
 
@@ -408,7 +408,7 @@ def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):
         vp = session.viewports[session.currentViewportName]
         ra = vp.displayedObject # rootAssembly
     model = mdb.models[ra.modelName]
-    instances = ra.instances.values() # all instances in the assembly
+    instances = list(ra.instances.values()) # all instances in the assembly
     return instance_derefDup(instances, rtol=rtol, atol=atol)
 
 
@@ -444,7 +444,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
     count = 0
     t0 = time()
     for inst in sorted(
-            filter(lambda i: hasattr(i, 'part'), instances),
+            [i for i in instances if hasattr(i, 'part')],
             reverse=True,
             key=lambda i: popularity[i.name] + len(i.nodes) + len(i.surfaces) + len(i.sets)):
         if ra.features[inst.name].isSuppressed():
@@ -508,7 +508,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
         instRotation = ARotation.from_rotvec(np.asarray(instAxis) * np.radians(instTh))
         instCentroid = instRotation.apply(instCentroid - offset) + offset
 
-        if DEBUG and not ra.features.has_key('CG-' + inst.part.name):
+        if DEBUG and 'CG-' + inst.part.name not in ra.features:
             pt = ra.ReferencePoint(instCentroid)
             ra.features.changeKey(fromName=pt.name, toName='CG-' + inst.part.name)
 
@@ -692,7 +692,7 @@ def part_principalProperties(part = None, properties={}):
     centroid = np.asarray(properties['volumeCentroid'])
     rot = properties['principalDirections']
 
-    if part.features.has_key(_principal_csys):
+    if _principal_csys in part.features:
         del part.features[_principal_csys]
     part.DatumCsysByThreePoints(
             name=_principal_csys,

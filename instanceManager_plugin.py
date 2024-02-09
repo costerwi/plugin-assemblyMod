@@ -140,11 +140,11 @@ class instanceManagerDB(AFXDataDialog):
                         instance, value))
                     self.getMode().selected = newName
                 elif col < 4:
-                    position = [eval(sender.getItemValue(row, col)) for col in 1, 2, 3]
+                    position = [eval(sender.getItemValue(row, col)) for col in (1, 2, 3)]
                     sendCommand("assemblyMod.instance_moveTo(instance=%r, position=%r)"%(
                         instance, position) )
                 else:
-                    rotation = [eval(sender.getItemValue(row, col)) for col in 4, 5, 6]
+                    rotation = [eval(sender.getItemValue(row, col)) for col in (4, 5, 6)]
                     sendCommand("assemblyMod.instance_rotateTo(instance=%r, rotation=%r)"%(
                         instance, rotation) )
             except (SyntaxError, ValueError, NameError) as e:

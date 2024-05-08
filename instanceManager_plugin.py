@@ -90,7 +90,7 @@ class instanceManagerDB(AFXDataDialog):
 
         # Sort table data
         sortColumn = self.table.getCurrentSortColumn()
-        filtered.sort(lambda a, b: cmp(a[sortColumn], b[sortColumn]))
+        filtered.sort(key=lambda a: a[sortColumn])
         if self.table.getColumnSortOrder(sortColumn) == AFXTable.SORT_DESCENDING:
             filtered.reverse()
 

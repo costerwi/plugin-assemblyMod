@@ -497,7 +497,7 @@ def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):
     return instance_derefDup(instances, rtol=rtol, atol=atol)
 
 
-def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
+def instance_derefDup(instances, rtol=1e-2, atol=1e-6):
     """Recognize and replace instances of repeated parts with multiple instances of one part.
 
     Note looser default rtol and atol since only checking instances that have been specified.

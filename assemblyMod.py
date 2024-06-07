@@ -551,20 +551,37 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
                     continue # skip parts that are replaced by other parts
                 if not otherProps.get('mass'):
                     continue # skip parts that don't have mass
-                if  not np.allclose(otherProps['mass'], mass, rtol=rtol, atol=0):
+
+                def matching(propertyName, rtol=rtol, atol=atol):
+                    "Check for closely matching property values between parts"
+                    valueA = properties.get(propertyName)
+                    valueB = otherProps.get(propertyName)
+                    if np.any(None == valueA) or np.any(None == valueB):
+                        if DEBUG:
+                            print(propertyName, 'None')
+                            print(inst.part.name, valueA)
+                            print(otherName, valueB)
+                        return False # Must both exist
+                    if not np.allclose(valueB, valueA, rtol=rtol, atol=atol):
+                        if DEBUG:
+                            print(propertyName, 'does not match', rtol, atol)
+                            print(inst.part.name, valueA)
+                            print(otherName, valueB)
+                        return False
+                    return True
+
+                if not matching('mass', atol=0):
                     continue # Mass does not a match
-                inertia = properties.get('principalInertia')
-                otherInertia = otherProps.get('principalInertia')
-                if np.any(None == inertia) or np.any(None == otherInertia):
-                    continue # Must both have inertia
-                if not np.allclose(otherInertia, inertia, rtol=rtol, atol=0):
+                if not matching('principalInertia', atol=0):
                     continue # Different mass properties
-                area = getAreaProperties(inst.part, properties).get('area')
-                otherArea = getAreaProperties(model.parts[otherName], otherProps).get('area')
-                if not (area and otherArea):
-                    continue # Must both have area
-                if not np.allclose(otherArea, area, rtol=rtol, atol=0): # Surface area doesn't match
+                getAreaProperties(inst.part, properties)
+                getAreaProperties(model.parts[otherName], otherProps)
+                if not matching('area', atol=0): # Surface area doesn't match
                     continue # Different area
+                getPrincipalDirections(inst.part, properties)
+                getPrincipalDirections(model.parts[otherName], otherProps)
+                if not matching('orientation', rtol=100*rtol, atol=1e4*atol):
+                    continue # Possible mirror
                 properties['replacement'] = otherName
                 break # found a match!
 
@@ -764,6 +781,7 @@ def getPrincipalDirections(part, properties={}):
         else:
             evectors[:,2] = np.cross(evectors[:,0], evectors[:,1])
         properties['principalDirections'] = np.ascontiguousarray(evectors.T)
+        properties['orientation'] = o.dot(evectors) # project onto principal axes
 
     return properties
 

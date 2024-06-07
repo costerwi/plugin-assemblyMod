@@ -19,6 +19,7 @@ def updateData():
 
 oldInstanceName = ''
 def outline(instanceName):
+    """Highlight named instance in the current iewport"""
     # TODO highlight mutiple selected instances
     from abaqus import session, highlight, unhighlight
     global oldInstanceName

@@ -74,7 +74,7 @@ class instanceManagerDB(AFXDataDialog):
 
     def updateData(self):
         "Query the latest instance info"
-        sendCommand("instanceManager.updateData()")
+        sendCommand("instanceManager.updateData()", writeToReplay=False)
 
 
     def updateTable(self):
@@ -160,7 +160,7 @@ class instanceManagerDB(AFXDataDialog):
         if row > 0:
             id = sender.getItemValue(row, 0)
             self.getMode().selected = id
-            sendCommand("instanceManager.outline(%r)"%id)
+            sendCommand("instanceManager.outline(%r)"%id, writeToReplay=False)
         if row == 0:
             self.updateTable()  # sorting has changed
         return 0

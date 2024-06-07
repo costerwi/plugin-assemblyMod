@@ -658,12 +658,15 @@ def part_instanceUnused():
             continue
         if inst.partName in unused:
             unused.remove(inst.partName)
+    vp.disableColorCodeUpdates()
     for partName in statusGenerator(sorted(unused), 'instances added'):
         i = 0
         while not i or instName in ra.instances.keys():
             i += 1
             instName = '{}-{}'.format(partName, i)
         ra.Instance(name=instName, part=model.parts[partName], dependent=True)
+    vp.enableColorCodeUpdates()
+
 
 def part_meshUsed():
     """Generate mesh on unmeshed used Parts and Instances"""

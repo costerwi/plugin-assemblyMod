@@ -57,6 +57,41 @@ if hasattr(ARotation, 'as_dcm'):
     ARotation.from_matrix = ARotation.from_dcm
 
 
+def humanDuration(seconds):
+    """Represent seconds as appropriate seconds, minutes, hours, or days
+
+    >>> humanDuration(155)
+    '2.6 minutes'
+    >>> humanDuration(33)
+    '33 seconds'
+    """
+    if seconds > 1.1*86400:
+        return '{:.1f} days'.format(seconds/86400.)
+    if seconds > 1.1*3600:
+        return '{:.1f} hours'.format(seconds/3600.)
+    if seconds > 1.1*60:
+        return '{:.1f} minutes'.format(seconds/60.)
+    return '{:.0f} seconds'.format(seconds)
+
+
+def statusGenerator(iterable, message='items', interval=20):
+    """Iterate through iterable and print status messages every 'interval' seconds as needed"""
+    from time import time
+    nTotal = len(iterable)
+    t0 = time() # starting time
+    tUpdate = t0 + interval # seconds to first update
+    for n, item in enumerate(iterable, 1):
+        yield item
+        t = time() # current time
+        if n >= nTotal: # finished
+            print('{} {} in {}.'.format(
+                nTotal, message, humanDuration(t - t0)))
+        elif t > tUpdate:
+            dt = (nTotal - n)*(t - t0)/n # estimate seconds remaining
+            print('{:.0f}% of {}. Estimated {} more to complete.'.format(
+                100.0*n/nTotal, message, humanDuration(dt)))
+            tUpdate = t + interval # seconds until next update
+
 # {{{1 ASSEMBLY INSTANCES DELETE
 
 def instance_delete(instances):
@@ -468,9 +503,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
     Note looser default rtol and atol since only checking instances that have been specified.
     """
 
-    from time import time
     from abaqus import session, mdb
-    from abaqusConstants import HIGH
 
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject # rootAssembly
@@ -492,11 +525,10 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
     count = 0
-    t0 = time()
-    for inst in sorted(
+    for inst in statusGenerator(sorted(
             [i for i in instances if hasattr(i, 'part')],
             reverse=True,
-            key=lambda i: popularity[i.name] + len(i.nodes) + len(i.surfaces) + len(i.sets)):
+            key=lambda i: popularity[i.name] + len(i.nodes) + len(i.surfaces) + len(i.sets)), 'instances checked'):
         if ra.features[inst.name].isSuppressed():
             continue # skip suppressed instances
         if not model.name == inst.modelName:
@@ -541,7 +573,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
             continue # No replacement found
         newProps = partProperties.get(newPartName)
         newPart = model.parts[newPartName]
-        print('Instance {0.name} replaced {1.name} with {2.name}'.format(
+        print('Instance {0.name} replaced Part {1.name} with {2.name}'.format(
             inst, inst.part, newPart))
         if DEBUG:
             part_principalProperties(inst.part, properties)
@@ -577,7 +609,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
 
     vp.enableColorCodeUpdates()
     vp.enableRefresh()
-    print("{} instances updated in {:.1f} seconds".format(count, time() - t0))
+    print(count, "instances updated")
 
 # {{{1 ASSEMBLY PARTS
 
@@ -593,10 +625,8 @@ def part_deleteUnused():
         if hasattr(inst, 'part'):
             used.add(inst.partName)
     unused = parts - used
-    print("{}/{} parts deleted.".format(
-        len(unused), len(parts)))
     vp.disableColorCodeUpdates()
-    for partName in unused:
+    for partName in statusGenerator(unused, 'unused Parts deleted'):
         del model.parts[partName]
     vp.enableColorCodeUpdates()
 
@@ -628,13 +658,12 @@ def part_instanceUnused():
             continue
         if inst.partName in unused:
             unused.remove(inst.partName)
-    for partName in sorted(unused):
+    for partName in statusGenerator(sorted(unused), 'instances added'):
         i = 0
         while not i or instName in ra.instances.keys():
             i += 1
             instName = '{}-{}'.format(partName, i)
         ra.Instance(name=instName, part=model.parts[partName], dependent=True)
-    print('Added {} instances'.format(len(unused)))
 
 def part_meshUsed():
     """Generate mesh on unmeshed used Parts and Instances"""
@@ -656,7 +685,7 @@ def part_meshUsed():
                 independent.append(inst)
             continue
         usedParts.add(inst.partName)
-    for partName in usedParts:
+    for partName in statusGenerator(usedParts, 'dependent parts meshed'):
         part = model.parts[partName]
         if len(part.nodes) > 0:
             continue # already has some mesh

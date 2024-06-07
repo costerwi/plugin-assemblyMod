@@ -22,24 +22,6 @@ class ARotation(Rotation):
     Carl Osterwisch, June 2022"""
 
     @classmethod
-    def from_matrix(cls, matrix):
-        """Initialize from rotation matrix
-
-        >>> m = ARotation.from_rotvec([0.2, 0.3, 0.4]).as_matrix()
-        >>> R = ARotation.from_matrix(m)
-        >>> R.__class__
-        <class '__main__.ARotation'>
-        >>> R.as_rotvec()
-        array([0.2, 0.3, 0.4])
-        """
-
-        if hasattr(Rotation, 'from_matrix'):
-            return cls.from_quat(Rotation.from_matrix(matrix).as_quat())
-        if hasattr(cls, 'align_vectors'):
-            return cls.align_vectors(matrix.T, np.eye(3))[0] #workaround 1
-        return cls.match_vectors(matrix.T, np.eye(3))[0] #workaround 2
-
-    @classmethod
     def from_csys(cls, csys):
         """Define rotation based on DatumCsys orientation"""
 
@@ -67,6 +49,13 @@ class ARotation(Rotation):
         if not theta:
             return np.array([0., 0., 1.]), 0.
         return v/theta, theta
+
+if hasattr(ARotation, 'as_dcm'):
+    # as_dcm and from_dcm were renamed as_matrix and from_matrix in scipy 1.4 (CAE >2023)
+    # Define the new names here for consistency
+    ARotation.as_matrix = ARotation.as_dcm
+    ARotation.from_matrix = ARotation.from_dcm
+
 
 # {{{1 ASSEMBLY INSTANCES DELETE
 
@@ -791,3 +780,9 @@ def part_principalProperties(part = None, properties={}):
             point2=centroid + rot[1], # y direction
         )
     print("\tIx={0[0]}, Iy={0[1]}, Iz={0[2]}".format(properties['principalInertia']))
+
+
+if __name__ == "__main__":
+    import doctest
+    DEBUG=False
+    doctest.testmod()

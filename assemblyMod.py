@@ -556,17 +556,29 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-6):
                     "Check for closely matching property values between parts"
                     valueA = properties.get(propertyName)
                     valueB = otherProps.get(propertyName)
-                    if np.any(None == valueA) or np.any(None == valueB):
+                    if type(valueA) is not type(valueB):
                         if DEBUG:
-                            print(propertyName, 'None')
+                            print(propertyName, 'different types')
                             print(inst.part.name, valueA)
                             print(otherName, valueB)
-                        return False # Must both exist
+                        return False
+                    if valueA is None:
+                        return True # Both are None
+                    if isinstance(valueB, np.ndarray):
+                        diff = np.linalg.norm(valueA - valueB)
+                        lengthB = np.linalg.norm(valueB)
+                        if diff > rtol*lengthB + atol:
+                            if DEBUG:
+                                print(propertyName, "vectors don't match", rtol, atol)
+                                print(inst.part.name, valueA)
+                                print(otherName, valueB, diff, rtol*lengthB + atol)
+                            return False
+                        return True # vector difference is small
                     if not np.allclose(valueB, valueA, rtol=rtol, atol=atol):
                         if DEBUG:
                             print(propertyName, 'does not match', rtol, atol)
                             print(inst.part.name, valueA)
-                            print(otherName, valueB)
+                            print(otherName, valueB, valueB - valueA)
                         return False
                     return True
 
@@ -576,11 +588,11 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-6):
                     continue # Different mass properties
                 getAreaProperties(inst.part, properties)
                 getAreaProperties(model.parts[otherName], otherProps)
-                if not matching('area', atol=0): # Surface area doesn't match
+                if not matching('area', atol=0):
                     continue # Different area
                 getPrincipalDirections(inst.part, properties)
                 getPrincipalDirections(model.parts[otherName], otherProps)
-                if not matching('orientation', rtol=100*rtol, atol=1e4*atol):
+                if not matching('orientation', rtol=100*rtol, atol=1e5*atol): # loose tolerance due to compounding error
                     continue # Possible mirror
                 properties['replacement'] = otherName
                 break # found a match!

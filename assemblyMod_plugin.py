@@ -14,32 +14,35 @@ class InstanceSelectProcedure(AFXProcedure):
 
     def __init__(self, owner, prompt, method, number=MANY):
         AFXProcedure.__init__(self, owner) # Construct the base class.
-        self._prompt = prompt
         self._number = number
 
-        # Command
         command = AFXGuiCommand(mode=self,
                 method=method,
                 objectName='assemblyMod',
                 registerQuery=FALSE)
 
-        # Keywords
         name = 'instance'
         if MANY == number:
             name += 's'
-        self.instancesKw = AFXObjectKeyword(
+        instancesKw = AFXObjectKeyword(
                 command=command,
                 name=name,
                 isRequired=TRUE)
 
-    def getFirstStep(self):
-        return AFXPickStep(
+        self.step1 = AFXPickStep(
                 owner=self,
-                keyword=self.instancesKw,
-                prompt='Select ' + self._prompt,
+                keyword=instancesKw,
+                prompt='Select ' + prompt,
                 entitiesToPick=INSTANCES,
                 numberToPick=self._number,
                 sequenceStyle=TUPLE)    # TUPLE or ARRAY
+
+    def getFirstStep(self):
+        return self.step1
+
+    def getLoopStep(self):
+        if MANY == self._number:
+            return self.step1  # loop until canceled
 
 
 class instanceRepositionCsysProcedure(AFXProcedure):

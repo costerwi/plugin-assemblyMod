@@ -66,7 +66,7 @@ def humanDuration(seconds):
     '33 seconds'
     """
     if seconds > 1.1*86400:
-        return '{:.1f} days'.format(seconds/86400.)
+        return '{:.2f} days'.format(seconds/86400.)
     if seconds > 1.1*3600:
         return '{:.1f} hours'.format(seconds/3600.)
     if seconds > 1.1*60:

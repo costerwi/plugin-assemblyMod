@@ -22,24 +22,6 @@ class ARotation(Rotation):
     Carl Osterwisch, June 2022"""
 
     @classmethod
-    def from_matrix(cls, matrix):
-        """Initialize from rotation matrix
-
-        >>> m = ARotation.from_rotvec([0.2, 0.3, 0.4]).as_matrix()
-        >>> R = ARotation.from_matrix(m)
-        >>> R.__class__
-        <class '__main__.ARotation'>
-        >>> R.as_rotvec()
-        array([0.2, 0.3, 0.4])
-        """
-
-        if hasattr(Rotation, 'from_matrix'):
-            return cls.from_quat(Rotation.from_matrix(matrix).as_quat())
-        if hasattr(cls, 'align_vectors'):
-            return cls.align_vectors(matrix.T, np.eye(3))[0] #workaround 1
-        return cls.match_vectors(matrix.T, np.eye(3))[0] #workaround 2
-
-    @classmethod
     def from_csys(cls, csys):
         """Define rotation based on DatumCsys orientation"""
 
@@ -67,6 +49,48 @@ class ARotation(Rotation):
         if not theta:
             return np.array([0., 0., 1.]), 0.
         return v/theta, theta
+
+if hasattr(ARotation, 'as_dcm'):
+    # as_dcm and from_dcm were renamed as_matrix and from_matrix in scipy 1.4 (CAE >2023)
+    # Define the new names here for consistency
+    ARotation.as_matrix = ARotation.as_dcm
+    ARotation.from_matrix = ARotation.from_dcm
+
+
+def humanDuration(seconds):
+    """Represent seconds as appropriate seconds, minutes, hours, or days
+
+    >>> humanDuration(155)
+    '2.6 minutes'
+    >>> humanDuration(33)
+    '33 seconds'
+    """
+    if seconds > 1.1*86400:
+        return '{:.2f} days'.format(seconds/86400.)
+    if seconds > 1.1*3600:
+        return '{:.1f} hours'.format(seconds/3600.)
+    if seconds > 1.1*60:
+        return '{:.1f} minutes'.format(seconds/60.)
+    return '{:.2g} seconds'.format(seconds)
+
+
+def statusGenerator(iterable, message='items', interval=20):
+    """Iterate through iterable and print status messages every 'interval' seconds as needed"""
+    from time import time
+    nTotal = len(iterable)
+    t0 = time() # starting time
+    tUpdate = t0 + interval # seconds to first update
+    for n, item in enumerate(iterable, 1):
+        yield item
+        t = time() # current time
+        if n >= nTotal: # finished
+            print('{} {} in {}.'.format(
+                nTotal, message, humanDuration(t - t0)))
+        elif t > tUpdate:
+            dt = (nTotal - n)*(t - t0)/n # estimate seconds remaining
+            print('{:.0f}% of {}. Estimated {} more to complete.'.format(
+                100.0*n/nTotal, message, humanDuration(dt)))
+            tUpdate = t + interval # seconds until next update
 
 # {{{1 ASSEMBLY INSTANCES DELETE
 
@@ -163,6 +187,44 @@ def instance_suppress_noVolume():
             continue
         if 0 == len(inst.part.cells) and 0 == inst.part.getVolume():
             suppress.append(inst)
+    instance_suppress(suppress)
+
+
+def instance_suppress_unmeshed():
+    """Suppress instances of parts which have unmeshed regions"""
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    suppress = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            continue
+        if inst.part.getUnmeshedRegions():
+            suppress.append(inst)
+    instance_suppress(suppress)
+
+
+def instance_suppress_badElements():
+    """Suppress instances of parts which have failed element analysis quality"""
+    from abaqus import session
+    from abaqusConstants import ANALYSIS_CHECKS
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    parts = {}  # partName => [ instances ]
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            continue
+        parts.setdefault(inst.part.name, []).append(inst)
+    suppress = []
+    for partName, instances in statusGenerator(parts.items(), 'part meshes checked'):
+        part = instances[0].part
+        quality = part.verifyMeshQuality(ANALYSIS_CHECKS)
+        if len(quality['failedElements']) > 0:
+            suppress.extend(instances)
     instance_suppress(suppress)
 
 
@@ -473,15 +535,13 @@ def assembly_derefDuplicate(ra=None, rtol=1e-4, atol=1e-8):
     return instance_derefDup(instances, rtol=rtol, atol=atol)
 
 
-def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
+def instance_derefDup(instances, rtol=1e-2, atol=1e-6):
     """Recognize and replace instances of repeated parts with multiple instances of one part.
 
     Note looser default rtol and atol since only checking instances that have been specified.
     """
 
-    from time import time
     from abaqus import session, mdb
-    from abaqusConstants import HIGH
 
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject # rootAssembly
@@ -503,11 +563,10 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
     vp.disableRefresh()
     vp.disableColorCodeUpdates()
     count = 0
-    t0 = time()
-    for inst in sorted(
+    for inst in statusGenerator(sorted(
             [i for i in instances if hasattr(i, 'part')],
             reverse=True,
-            key=lambda i: popularity[i.name] + len(i.nodes) + len(i.surfaces) + len(i.sets)):
+            key=lambda i: popularity[i.name] + len(i.nodes) + len(i.surfaces) + len(i.sets)), 'instances checked'):
         if ra.features[inst.name].isSuppressed():
             continue # skip suppressed instances
         if not model.name == inst.modelName:
@@ -530,20 +589,49 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
                     continue # skip parts that are replaced by other parts
                 if not otherProps.get('mass'):
                     continue # skip parts that don't have mass
-                if  not np.allclose(otherProps['mass'], mass, rtol=rtol, atol=0):
+
+                def matching(propertyName, rtol=rtol, atol=atol):
+                    "Check for closely matching property values between parts"
+                    valueA = properties.get(propertyName)
+                    valueB = otherProps.get(propertyName)
+                    if type(valueA) is not type(valueB):
+                        if DEBUG:
+                            print(propertyName, 'different types')
+                            print(inst.part.name, valueA)
+                            print(otherName, valueB)
+                        return False
+                    if valueA is None:
+                        return True # Both are None
+                    if isinstance(valueB, np.ndarray):
+                        diff = np.linalg.norm(valueA - valueB)
+                        lengthB = np.linalg.norm(valueB)
+                        if diff > rtol*lengthB + atol:
+                            if DEBUG:
+                                print(propertyName, "vectors don't match", rtol, atol)
+                                print(inst.part.name, valueA)
+                                print(otherName, valueB, diff, rtol*lengthB + atol)
+                            return False
+                        return True # vector difference is small
+                    if not np.allclose(valueB, valueA, rtol=rtol, atol=atol):
+                        if DEBUG:
+                            print(propertyName, 'does not match', rtol, atol)
+                            print(inst.part.name, valueA)
+                            print(otherName, valueB, valueB - valueA)
+                        return False
+                    return True
+
+                if not matching('mass', atol=0):
                     continue # Mass does not a match
-                inertia = properties.get('principalInertia')
-                otherInertia = otherProps.get('principalInertia')
-                if np.any(None == inertia) or np.any(None == otherInertia):
-                    continue # Must both have inertia
-                if not np.allclose(otherInertia, inertia, rtol=rtol, atol=0):
+                if not matching('principalInertia', atol=0):
                     continue # Different mass properties
-                area = getAreaProperties(inst.part, properties).get('area')
-                otherArea = getAreaProperties(model.parts[otherName], otherProps).get('area')
-                if not (area and otherArea):
-                    continue # Must both have area
-                if not np.allclose(otherArea, area, rtol=rtol, atol=0): # Surface area doesn't match
+                getAreaProperties(inst.part, properties)
+                getAreaProperties(model.parts[otherName], otherProps)
+                if not matching('area', atol=0):
                     continue # Different area
+                getPrincipalDirections(inst.part, properties)
+                getPrincipalDirections(model.parts[otherName], otherProps)
+                if not matching('orientation', rtol=100*rtol, atol=1e5*atol): # loose tolerance due to compounding error
+                    continue # Possible mirror
                 properties['replacement'] = otherName
                 break # found a match!
 
@@ -552,7 +640,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
             continue # No replacement found
         newProps = partProperties.get(newPartName)
         newPart = model.parts[newPartName]
-        print('Instance {0.name} replaced {1.name} with {2.name}'.format(
+        print('Instance {0.name} replaced Part {1.name} with {2.name}'.format(
             inst, inst.part, newPart))
         if DEBUG:
             part_principalProperties(inst.part, properties)
@@ -588,7 +676,7 @@ def instance_derefDup(instances, rtol=1e-2, atol=1e-8):
 
     vp.enableColorCodeUpdates()
     vp.enableRefresh()
-    print("{} instances updated in {:.1f} seconds".format(count, time() - t0))
+    print(count, "instances updated")
 
 # {{{1 ASSEMBLY PARTS
 
@@ -604,10 +692,8 @@ def part_deleteUnused():
         if hasattr(inst, 'part'):
             used.add(inst.partName)
     unused = parts - used
-    print("{}/{} parts deleted.".format(
-        len(unused), len(parts)))
     vp.disableColorCodeUpdates()
-    for partName in unused:
+    for partName in statusGenerator(unused, 'unused Parts deleted'):
         del model.parts[partName]
     vp.enableColorCodeUpdates()
 
@@ -639,22 +725,52 @@ def part_instanceUnused():
             continue
         if inst.partName in unused:
             unused.remove(inst.partName)
-    for partName in sorted(unused):
+    vp.disableColorCodeUpdates()
+    for partName in statusGenerator(sorted(unused), 'instances added'):
         i = 0
         while not i or instName in ra.instances.keys():
             i += 1
             instName = '{}-{}'.format(partName, i)
         ra.Instance(name=instName, part=model.parts[partName], dependent=True)
-    print('Added {} instances'.format(len(unused)))
+    vp.enableColorCodeUpdates()
 
-def part_meshUsed():
-    """Generate mesh on unmeshed used Parts and Instances"""
+
+def part_mesh(partNames, refinement=1.0):
+    """Generate mesh on listed part names"""
     from abaqus import session, mdb
+    from abaqusConstants import SIZE, DEFAULT_SIZE, TET
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
     model = mdb.models[ra.modelName]
-    usedParts = set() # set of used part names
-    independent = [] # list of independent instances
+    unmeshed = set()
+    for partName in statusGenerator(partNames, 'parts meshed'):
+        part = model.parts[partName]
+        size = part.getPartSeeds(SIZE) or part.getPartSeeds(DEFAULT_SIZE)
+        part.seedPart(refinement*size)
+        part.generateMesh()
+        if part.getUnmeshedRegions():
+            # Try again with TET mesh
+            part.setMeshControls(regions=part.cells, elemShape=TET)
+            part.generateMesh()
+            if part.getUnmeshedRegions():
+                unmeshed.add(part.name)
+    if unmeshed:
+        print(len(unmeshed), 'parts failed to mesh.')
+    ra.regenerate()
+
+
+def part_meshRefine(instances, refinement=0.7):
+    """Refine the global mesh size on selected Parts"""
+    partNames = {inst.part.name for inst in instances if hasattr(inst, 'part')}
+    part_mesh(partNames, refinement)
+
+
+def part_meshUnmeshed():
+    """Generate mesh on unmeshed used Parts and Instances"""
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    unmeshedParts = set() # set of used part names
     for inst in ra.instances.values():
         if ra.features[inst.name].isSuppressed():
             continue
@@ -663,17 +779,59 @@ def part_meshUsed():
         if inst.excludedFromSimulation:
             continue
         if not inst.dependent:
-            if 0 == len(inst.nodes):
-                independent.append(inst)
+            continue  # TODO mesh independent instances
+        if not inst.part.getUnmeshedRegions():
             continue
-        usedParts.add(inst.partName)
-    for partName in usedParts:
+        unmeshedParts.add(inst.partName)
+    if unmeshedParts:
+        part_mesh(unmeshedParts)
+    else:
+        print('No unmeshed dependent parts found')
+
+
+def part_improveRefinement(instances):
+    "Graphically select parts that need better curve refinement"
+    from abaqus import session, mdb
+    from abaqusConstants import EXTRA_COARSE, COARSE, MEDIUM, FINE, EXTRA_FINE
+    refinement = EXTRA_COARSE, COARSE, MEDIUM, FINE, EXTRA_FINE
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    model = mdb.models[ra.modelName]
+    partNames = {inst.part.name for inst in instances
+                 if hasattr(inst, 'part') and inst.part.geometryRefinement is not EXTRA_FINE}
+    for partName in statusGenerator(partNames, 'parts refined'):
         part = model.parts[partName]
-        if len(part.nodes) > 0:
-            continue # already has some mesh
-        part.generateMesh()
-    if independent:
-        ra.generateMesh(regions=independent)
+        index = refinement.index(part.geometryRefinement)
+        part.setValues(geometryRefinement=refinement[index + 1])
+    if partNames:
+        ra.regenerate()
+    else:
+        print('No parts refined')
+
+
+def part_resetRefinement():
+    """Reset active parts to their default "coarse" level of geometry refinement"""
+    from abaqus import session, mdb
+    from abaqusConstants import COARSE
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    model = mdb.models[ra.modelName]
+    partNames = set()
+    for inst in ra.instances.values():
+        if ra.features[inst.name].isSuppressed():
+            continue
+        if not hasattr(inst, 'part'):
+            continue
+        if inst.part.name in partNames:
+            continue
+        if inst.part.geometryRefinement is not COARSE:
+            partNames.add(inst.part.name)
+    for partName in statusGenerator(partNames, 'Parts set to coarse geometry refinement'):
+        model.parts[partName].setValues(geometryRefinement=COARSE)
+    if partNames:
+        ra.regenerate()
+    else:
+        print('No part refinement was reset')
 
 # {{{1 PART
 
@@ -743,6 +901,7 @@ def getPrincipalDirections(part, properties={}):
         else:
             evectors[:,2] = np.cross(evectors[:,0], evectors[:,1])
         properties['principalDirections'] = np.ascontiguousarray(evectors.T)
+        properties['orientation'] = o.dot(evectors) # project onto principal axes
 
     return properties
 
@@ -791,3 +950,9 @@ def part_principalProperties(part = None, properties={}):
             point2=centroid + rot[1], # y direction
         )
     print("\tIx={0[0]}, Iy={0[1]}, Iz={0[2]}".format(properties['principalInertia']))
+
+
+if __name__ == "__main__":
+    import doctest
+    DEBUG=False
+    doctest.testmod()

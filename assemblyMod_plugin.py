@@ -2,7 +2,8 @@
 
 Carl Osterwisch <costerwi@gmail.com> November 2013
 """
-__version__ = "0.9.1"
+__version__ = "0.10.0"
+helpUrl='https://github.com/costerwi/plugin-assemblyMod'
 
 from abaqusGui import *
 
@@ -10,36 +11,42 @@ from abaqusGui import *
 # {{{1 Procedure definition
 ###########################################################################
 class InstanceSelectProcedure(AFXProcedure):
-    """Class to allow user to select Instances and run an assemblyMod command"""
+    """Base class to allow user to select Instances and run an assemblyMod command"""
 
-    def __init__(self, owner, prompt, method, number=MANY):
+    prompt = 'instances to operate upon' # must be defined by child class
+    method = 'thing_to_do' # must be defined by child class
+
+    def __init__(self, owner):
         AFXProcedure.__init__(self, owner) # Construct the base class.
-        self._prompt = prompt
-        self._number = number
 
-        # Command
-        command = AFXGuiCommand(mode=self,
-                method=method,
+        self.command = AFXGuiCommand(mode=self,
+                method=self.method,
                 objectName='assemblyMod',
                 registerQuery=FALSE)
 
-        # Keywords
-        name = 'instance'
-        if MANY == number:
-            name += 's'
+        objectToPick = self.prompt.split()[0]
+        if objectToPick.endswith('s'): # plural
+            self.numberToPick = MANY
+        else:
+            self.numberToPick = ONE
         self.instancesKw = AFXObjectKeyword(
-                command=command,
-                name=name,
+                command=self.command,
+                name=objectToPick,
                 isRequired=TRUE)
 
     def getFirstStep(self):
-        return AFXPickStep(
+        self.step1 = AFXPickStep(
                 owner=self,
                 keyword=self.instancesKw,
-                prompt='Select ' + self._prompt,
+                prompt='Select ' + self.prompt,
                 entitiesToPick=INSTANCES,
-                numberToPick=self._number,
+                numberToPick=self.numberToPick,
                 sequenceStyle=TUPLE)    # TUPLE or ARRAY
+        return self.step1
+
+    def getLoopStep(self):
+        if MANY == self.numberToPick:
+            return self.step1  # loop until canceled
 
 
 class instanceRepositionCsysProcedure(AFXProcedure):
@@ -151,24 +158,24 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='assembly_derefDuplicate()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly'],
         description='Use mass properties to automatically identify and replace instances of similar parts with multiple instances of one part. '
             'Two parts must have the same mass, area, and primary moments of inertia within 0.01% to be recognized as equal.'
         )
 
 class InstanceDuplicatePicked(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances to search for common parts'
+        method = 'instance_derefDup'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Pick Duplicate Parts...',
-        object=InstanceDuplicatePicked(toolset, 'instances to search for common parts', 'instance_derefDup'),
+        object=InstanceDuplicatePicked(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly'],
         description='Graphically select instances to replace with a common part. '
             'Replacement will not happen if mass properties are significantly different from each other. '
@@ -180,8 +187,8 @@ toolset.registerGuiMenuButton(
         object=instanceRepositionCsysProcedure(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly'],
         description='Reposition instances based on position and orientation of selected source and destination csys.'
         )
@@ -191,8 +198,8 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='instance_matchname()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly'],
         description='Update instance names using part name as a base.')
 
@@ -201,8 +208,8 @@ toolset.registerGuiMenuButton(
         object=InstanceRenameProcedure(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly'],
         description='Rename instances using specified criteria'
         )
@@ -216,8 +223,8 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='instance_delete_hidden()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly'],
         description='Delete instances that are currently hidden.')
 
@@ -227,8 +234,8 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='instance_delete_suppressed()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly'],
         description='Delete instances that are currently suppressed.')
 
@@ -239,32 +246,32 @@ menu.pop()
 menu.append('&Suppress')
 
 class InstanceSuppressPicked(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances to suppress'
+        method = 'instance_suppress'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Picked Instances...',
-        object=InstanceSuppressPicked(toolset, 'instances to suppress', 'instance_suppress'),
+        object=InstanceSuppressPicked(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Graphically select instances to suppress in the assembly.'
         )
 
 class InstanceSuppressPart(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances of parts to suppress'
+        method = 'instance_suppress_part'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|All Instances of &Part...',
-        object=InstanceSuppressPart(toolset, 'parts to suppress', 'instance_suppress_part'),
+        object=InstanceSuppressPart(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Select parts to suppress their instancse.'
         )
 
@@ -273,8 +280,8 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='instance_suppress_noArea()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Suppress instances that have no surface area.')
 
@@ -283,19 +290,39 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='instance_suppress_noVolume()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Suppress instances that have no volume.')
+
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|&Unmeshed',
+        moduleName='assemblyMod',
+        functionName='instance_suppress_unmeshed()',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
+        description='Suppress instances of parts which have unmeshed regions.')
+
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|Containing elements of failed &quality',
+        moduleName='assemblyMod',
+        functionName='instance_suppress_badElements()',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
+        description='Suppress instances of parts which have unmeshed regions.')
 
 toolset.registerKernelMenuButton(
         buttonText='|'.join(menu) + '|&Invert',
         moduleName='assemblyMod',
         functionName='instance_suppress_invert()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Resume suppressed instances and suppress active instances.')
 
 toolset.registerKernelMenuButton(
@@ -303,9 +330,9 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='instance_suppress_resumeAll()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Resume suppressed instances.')
 
 menu.pop()
@@ -315,32 +342,32 @@ menu.pop()
 menu.append('&Hide')
 
 class InstanceHidePicked(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances to hide'
+        method = 'instance_hide'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Picked Instances...',
-        object=InstanceHidePicked(toolset, 'instances to hide', 'instance_hide'),
+        object=InstanceHidePicked(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Graphically select instances to hide from the assembly.' \
                 ' See also: right-click menu, Hide Instance.'
         )
 
 class InstanceHidePart(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances of parts to hide'
+        method = 'instance_hide_part'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|All Instances of &Part...',
-        object=InstanceHidePart(toolset, 'parts to hide', 'instance_hide_part'),
+        object=InstanceHidePart(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Hide visible instances and show hidden instances.'
         )
@@ -350,8 +377,8 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='instance_hide_invert()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Show hidden instances and hide shown instances.')
 
@@ -360,8 +387,8 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='instance_hide_showAll()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Show all hidden instances.')
 
@@ -377,22 +404,22 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='part_deleteUnused()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly'],
         description='Remove parts that are not referenced by any instances.')
 
 class InstanceEditPicked(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instance to edit part'
+        method ='part_edit'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Edit Picked...',
-        object=InstanceEditPicked(toolset, 'instance to edit part', 'part_edit', ONE),
+        object=InstanceEditPicked(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly', 'Interaction', 'Load'],
         description='Graphically select instance to edit its part.'
         )
@@ -402,30 +429,78 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='part_instanceUnused()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Assembly'],
         description='Instance parts that are not referenced by any instances.')
 
-toolset.registerKernelMenuButton(
-        buttonText='|'.join(menu) + '|&Mesh unmeshed Parts',
-        moduleName='assemblyMod',
-        functionName='part_meshUsed()',
+menu.append('&Mesh')
+
+class InstanceMeshRefinePicked(InstanceSelectProcedure):
+        prompt = 'instances of parts to refine global seed size'
+        method ='part_meshRefine'
+
+toolset.registerGuiMenuButton(
+        buttonText='|'.join(menu) + '|&Refine Picked...',
+        object=InstanceMeshRefinePicked(toolset),
+        kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
-        applicableModules=['Assembly'],
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Mesh'],
+        description='Reduce global mesh seed size by factor 0.7 on selected Parts.')
+
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|&Unmeshed Parts',
+        moduleName='assemblyMod',
+        functionName='part_meshUnmeshed()',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Mesh'],
         description='Generate mesh on unmeshed used Parts and Instances.')
 
-# {{{1 PART
+menu.pop()
+menu.append('&Curve refinement')
+
+class PartCurveRefinement(InstanceSelectProcedure):
+        prompt = 'instances of parts to be refined'
+        method = 'part_improveRefinement'
+
+toolset.registerGuiMenuButton(
+        buttonText='|'.join(menu) + '|&Improve for picked...',
+        object=PartCurveRefinement(toolset),
+        kernelInitString='import assemblyMod',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
+        description='Graphically select parts that need better curve refinement. ' \
+            'The display refinement will improve each time selected until the maximum "extra fine" is achieved.'
+        )
+
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|&Reset all to coarse',
+        moduleName='assemblyMod',
+        functionName='part_resetRefinement()',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
+        description='Reset active parts to their default "coarse" level of geometry refinement. ' \
+                'This setting may be required for section cuts.')
+
+menu.pop()
+
+# {{{1 PART module only
 
 toolset.registerKernelMenuButton(
         buttonText='Principal mass properties',
         moduleName='assemblyMod',
         functionName='part_principalProperties()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Part'],
         description='Calculate and report principal mass properties.')
 
@@ -434,7 +509,7 @@ toolset.registerKernelMenuButton(
         moduleName='assemblyMod',
         functionName='part_surfaceAreas()',
         author='Carl Osterwisch',
-        version=str(__version__),
-        helpUrl='https://github.com/costerwi/plugin-assemblyMod',
+        version=__version__,
+        helpUrl=helpUrl,
         applicableModules=['Part'],
         description='Calculate and report area of all named surfaces.')

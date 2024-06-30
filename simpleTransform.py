@@ -3,6 +3,7 @@
 Carl Osterwisch, April 2022
 """
 
+from __future__ import print_function
 import numpy as np
 
 class Rotation:
@@ -111,10 +112,10 @@ class Rotation:
     def as_matrix(self):
         """Return equivalent rotation matrix
         
-        >>> Rotation.from_rotvec([0, 0, 0]).as_matrix()
-        array([[1., 0., 0.],
-               [0., 1., 0.],
-               [0., 0., 1.]])
+        >>> print(Rotation.from_rotvec([0, 0, 0]).as_matrix())
+        [[1. 0. 0.]
+         [0. 1. 0.]
+         [0. 0. 1.]]
         >>> m = Rotation.from_rotvec(np.deg2rad([0, 0, 90])).as_matrix()
         >>> np.allclose(m, np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]]).T)
         True

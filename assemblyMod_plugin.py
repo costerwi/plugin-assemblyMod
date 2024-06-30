@@ -2,7 +2,7 @@
 
 Carl Osterwisch <costerwi@gmail.com> November 2013
 """
-__version__ = "0.9.1"
+__version__ = "0.10.0"
 helpUrl='https://github.com/costerwi/plugin-assemblyMod'
 
 from abaqusGui import *

@@ -256,7 +256,7 @@ toolset.registerGuiMenuButton(
         author='Carl Osterwisch',
         version=__version__,
         helpUrl=helpUrl,
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Graphically select instances to suppress in the assembly.'
         )
 
@@ -271,7 +271,7 @@ toolset.registerGuiMenuButton(
         author='Carl Osterwisch',
         version=__version__,
         helpUrl=helpUrl,
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Select parts to suppress their instancse.'
         )
 
@@ -292,8 +292,28 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=__version__,
         helpUrl=helpUrl,
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Suppress instances that have no volume.')
+
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|&Unmeshed parts',
+        moduleName='assemblyMod',
+        functionName='instance_suppress_unmeshed()',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
+        description='Suppress instances of parts which have unmeshed regions.')
+
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|Containing elements of failed &quality',
+        moduleName='assemblyMod',
+        functionName='instance_suppress_badElements()',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
+        description='Suppress instances of parts which have unmeshed regions.')
 
 toolset.registerKernelMenuButton(
         buttonText='|'.join(menu) + '|&Invert',
@@ -302,7 +322,7 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=__version__,
         helpUrl=helpUrl,
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Resume suppressed instances and suppress active instances.')
 
 toolset.registerKernelMenuButton(
@@ -312,7 +332,7 @@ toolset.registerKernelMenuButton(
         author='Carl Osterwisch',
         version=__version__,
         helpUrl=helpUrl,
-        applicableModules=['Assembly', 'Interaction', 'Load'],
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
         description='Resume suppressed instances.')
 
 menu.pop()
@@ -414,14 +434,30 @@ toolset.registerKernelMenuButton(
         applicableModules=['Assembly'],
         description='Instance parts that are not referenced by any instances.')
 
-toolset.registerKernelMenuButton(
-        buttonText='|'.join(menu) + '|&Mesh unmeshed Parts',
-        moduleName='assemblyMod',
-        functionName='part_meshUsed()',
+menu.append('&Mesh')
+
+class InstanceMeshRefinePicked(InstanceSelectProcedure):
+        prompt = 'instances of parts to refine global seed size'
+        method ='part_meshRefine'
+
+toolset.registerGuiMenuButton(
+        buttonText='|'.join(menu) + '|&Refine Picked...',
+        object=InstanceMeshRefinePicked(toolset),
+        kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=__version__,
         helpUrl=helpUrl,
-        applicableModules=['Assembly'],
+        applicableModules=['Assembly', 'Mesh'],
+        description='Reduce global mesh seed size by factor 0.7 on selected Parts.')
+
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|&Unmeshed Parts',
+        moduleName='assemblyMod',
+        functionName='part_meshUnmeshed()',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Mesh'],
         description='Generate mesh on unmeshed used Parts and Instances.')
 
 # {{{1 PART

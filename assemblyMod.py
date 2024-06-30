@@ -190,6 +190,44 @@ def instance_suppress_noVolume():
     instance_suppress(suppress)
 
 
+def instance_suppress_unmeshed():
+    """Suppress instances of parts which have unmeshed regions"""
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    suppress = []
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            continue
+        if inst.part.getUnmeshedRegions():
+            suppress.append(inst)
+    instance_suppress(suppress)
+
+
+def instance_suppress_badElements():
+    """Suppress instances of parts which have failed element analysis quality"""
+    from abaqus import session
+    from abaqusConstants import ANALYSIS_CHECKS
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    parts = {}  # partName => [ instances ]
+    for inst in ra.instances.values():
+        if not hasattr(inst, 'part'):
+            continue # skip non-part instances
+        if ra.features[inst.name].isSuppressed():
+            continue
+        parts.setdefault(inst.part.name, []).append(inst)
+    suppress = []
+    for partName, instances in statusGenerator(parts.items(), 'part meshes checked'):
+        part = instances[0].part
+        quality = part.verifyMeshQuality(ANALYSIS_CHECKS)
+        if len(quality['failedElements']) > 0:
+            suppress.extend(instances)
+    instance_suppress(suppress)
+
+
 def instance_suppress_invert():
     from abaqus import session
     vp = session.viewports[session.currentViewportName]
@@ -697,14 +735,42 @@ def part_instanceUnused():
     vp.enableColorCodeUpdates()
 
 
-def part_meshUsed():
-    """Generate mesh on unmeshed used Parts and Instances"""
+def part_mesh(partNames, refinement=1.0):
+    """Generate mesh on listed part names"""
     from abaqus import session, mdb
     from abaqusConstants import SIZE, DEFAULT_SIZE, TET
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
     model = mdb.models[ra.modelName]
-    usedParts = set() # set of used part names
+    unmeshed = set()
+    for partName in statusGenerator(partNames, 'parts meshed'):
+        part = model.parts[partName]
+        size = part.getPartSeeds(SIZE) or part.getPartSeeds(DEFAULT_SIZE)
+        part.seedPart(refinement*size)
+        part.generateMesh()
+        if part.getUnmeshedRegions():
+            # Try again with TET mesh
+            part.setMeshControls(regions=part.cells, elemShape=TET)
+            part.generateMesh()
+            if part.getUnmeshedRegions():
+                unmeshed.add(part.name)
+    if unmeshed:
+        print(len(unmeshed), 'parts failed to mesh.')
+    ra.regenerate()
+
+
+def part_meshRefine(instances, refinement=0.7):
+    """Refine the global mesh size on selected Parts"""
+    partNames = {inst.part.name for inst in instances if hasattr(inst, 'part')}
+    part_mesh(partNames, refinement)
+
+
+def part_meshUnmeshed():
+    """Generate mesh on unmeshed used Parts and Instances"""
+    from abaqus import session
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    unmeshedParts = set() # set of used part names
     for inst in ra.instances.values():
         if ra.features[inst.name].isSuppressed():
             continue
@@ -716,8 +782,13 @@ def part_meshUsed():
             continue  # TODO mesh independent instances
         if not inst.part.getUnmeshedRegions():
             continue
-        usedParts.add(inst.partName)
-    for partName in statusGenerator(usedParts, 'dependent parts meshed'):
+        unmeshedParts.add(inst.partName)
+    if unmeshedParts:
+        part_mesh(unmeshedParts)
+    else:
+        print('No unmeshed dependent parts found')
+
+
         part = model.parts[partName]
         size = part.getPartSeeds(SIZE)
         if not size:

@@ -700,11 +700,11 @@ def part_instanceUnused():
 def part_meshUsed():
     """Generate mesh on unmeshed used Parts and Instances"""
     from abaqus import session, mdb
+    from abaqusConstants import SIZE, DEFAULT_SIZE, TET
     vp = session.viewports[session.currentViewportName]
     ra = vp.displayedObject
     model = mdb.models[ra.modelName]
     usedParts = set() # set of used part names
-    independent = [] # list of independent instances
     for inst in ra.instances.values():
         if ra.features[inst.name].isSuppressed():
             continue
@@ -713,17 +713,25 @@ def part_meshUsed():
         if inst.excludedFromSimulation:
             continue
         if not inst.dependent:
-            if 0 == len(inst.nodes):
-                independent.append(inst)
+            continue  # TODO mesh independent instances
+        if not inst.part.getUnmeshedRegions():
             continue
         usedParts.add(inst.partName)
     for partName in statusGenerator(usedParts, 'dependent parts meshed'):
         part = model.parts[partName]
-        if len(part.nodes) > 0:
-            continue # already has some mesh
+        size = part.getPartSeeds(SIZE)
+        if not size:
+            size = part.getPartSeeds(DEFAULT_SIZE)
+        part.seedPart(size)
         part.generateMesh()
-    if independent:
-        ra.generateMesh(regions=independent)
+        if part.getUnmeshedRegions():
+            # Try again with TET mesh
+            part.setMeshControls(regions=part.cells, elemShape=TET)
+            part.generateMesh()
+    if usedParts:
+        ra.regenerate()
+    else:
+        print('No unmeshed dependent parts found')
 
 # {{{1 PART
 

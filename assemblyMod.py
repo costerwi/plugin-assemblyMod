@@ -71,7 +71,7 @@ def humanDuration(seconds):
         return '{:.1f} hours'.format(seconds/3600.)
     if seconds > 1.1*60:
         return '{:.1f} minutes'.format(seconds/60.)
-    return '{:.0f} seconds'.format(seconds)
+    return '{:.2g} seconds'.format(seconds)
 
 
 def statusGenerator(iterable, message='items', interval=20):

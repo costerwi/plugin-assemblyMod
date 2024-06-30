@@ -460,7 +460,39 @@ toolset.registerKernelMenuButton(
         applicableModules=['Assembly', 'Mesh'],
         description='Generate mesh on unmeshed used Parts and Instances.')
 
-# {{{1 PART
+menu.pop()
+menu.append('&Curve refinement')
+
+class PartCurveRefinement(InstanceSelectProcedure):
+        prompt = 'instances of parts to be refined'
+        method = 'part_improveRefinement'
+
+toolset.registerGuiMenuButton(
+        buttonText='|'.join(menu) + '|&Improve for picked...',
+        object=PartCurveRefinement(toolset),
+        kernelInitString='import assemblyMod',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
+        description='Graphically select parts that need better curve refinement. ' \
+            'The display refinement will improve each time selected until the maximum "extra fine" is achieved.'
+        )
+
+toolset.registerKernelMenuButton(
+        buttonText='|'.join(menu) + '|&Reset all to coarse',
+        moduleName='assemblyMod',
+        functionName='part_resetRefinement()',
+        author='Carl Osterwisch',
+        version=__version__,
+        helpUrl=helpUrl,
+        applicableModules=['Assembly', 'Interaction', 'Load', 'Mesh'],
+        description='Reset active parts to their default "coarse" level of geometry refinement. ' \
+                'This setting may be required for section cuts.')
+
+menu.pop()
+
+# {{{1 PART module only
 
 toolset.registerKernelMenuButton(
         buttonText='Principal mass properties',

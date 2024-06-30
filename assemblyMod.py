@@ -789,20 +789,49 @@ def part_meshUnmeshed():
         print('No unmeshed dependent parts found')
 
 
+def part_improveRefinement(instances):
+    "Graphically select parts that need better curve refinement"
+    from abaqus import session, mdb
+    from abaqusConstants import EXTRA_COARSE, COARSE, MEDIUM, FINE, EXTRA_FINE
+    refinement = EXTRA_COARSE, COARSE, MEDIUM, FINE, EXTRA_FINE
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    model = mdb.models[ra.modelName]
+    partNames = {inst.part.name for inst in instances
+                 if hasattr(inst, 'part') and inst.part.geometryRefinement is not EXTRA_FINE}
+    for partName in statusGenerator(partNames, 'parts refined'):
         part = model.parts[partName]
-        size = part.getPartSeeds(SIZE)
-        if not size:
-            size = part.getPartSeeds(DEFAULT_SIZE)
-        part.seedPart(size)
-        part.generateMesh()
-        if part.getUnmeshedRegions():
-            # Try again with TET mesh
-            part.setMeshControls(regions=part.cells, elemShape=TET)
-            part.generateMesh()
-    if usedParts:
+        index = refinement.index(part.geometryRefinement)
+        part.setValues(geometryRefinement=refinement[index + 1])
+    if partNames:
         ra.regenerate()
     else:
-        print('No unmeshed dependent parts found')
+        print('No parts refined')
+
+
+def part_resetRefinement():
+    """Reset active parts to their default "coarse" level of geometry refinement"""
+    from abaqus import session, mdb
+    from abaqusConstants import COARSE
+    vp = session.viewports[session.currentViewportName]
+    ra = vp.displayedObject
+    model = mdb.models[ra.modelName]
+    partNames = set()
+    for inst in ra.instances.values():
+        if ra.features[inst.name].isSuppressed():
+            continue
+        if not hasattr(inst, 'part'):
+            continue
+        if inst.part.name in partNames:
+            continue
+        if inst.part.geometryRefinement is not COARSE:
+            partNames.add(inst.part.name)
+    for partName in statusGenerator(partNames, 'Parts set to coarse geometry refinement'):
+        model.parts[partName].setValues(geometryRefinement=COARSE)
+    if partNames:
+        ra.regenerate()
+    else:
+        print('No part refinement was reset')
 
 # {{{1 PART
 

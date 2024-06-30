@@ -296,7 +296,7 @@ toolset.registerKernelMenuButton(
         description='Suppress instances that have no volume.')
 
 toolset.registerKernelMenuButton(
-        buttonText='|'.join(menu) + '|&Unmeshed parts',
+        buttonText='|'.join(menu) + '|&Unmeshed',
         moduleName='assemblyMod',
         functionName='instance_suppress_unmeshed()',
         author='Carl Osterwisch',

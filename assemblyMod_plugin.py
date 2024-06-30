@@ -11,38 +11,41 @@ from abaqusGui import *
 # {{{1 Procedure definition
 ###########################################################################
 class InstanceSelectProcedure(AFXProcedure):
-    """Class to allow user to select Instances and run an assemblyMod command"""
+    """Base class to allow user to select Instances and run an assemblyMod command"""
 
-    def __init__(self, owner, prompt, method, number=MANY):
+    prompt = 'instances to operate upon' # must be defined by child class
+    method = 'thing_to_do' # must be defined by child class
+
+    def __init__(self, owner):
         AFXProcedure.__init__(self, owner) # Construct the base class.
-        self._number = number
 
-        command = AFXGuiCommand(mode=self,
-                method=method,
+        self.command = AFXGuiCommand(mode=self,
+                method=self.method,
                 objectName='assemblyMod',
                 registerQuery=FALSE)
 
-        name = 'instance'
-        if MANY == number:
-            name += 's'
-        instancesKw = AFXObjectKeyword(
-                command=command,
-                name=name,
+        objectToPick = self.prompt.split()[0]
+        if objectToPick.endswith('s'): # plural
+            self.numberToPick = MANY
+        else:
+            self.numberToPick = ONE
+        self.instancesKw = AFXObjectKeyword(
+                command=self.command,
+                name=objectToPick,
                 isRequired=TRUE)
 
+    def getFirstStep(self):
         self.step1 = AFXPickStep(
                 owner=self,
-                keyword=instancesKw,
-                prompt='Select ' + prompt,
+                keyword=self.instancesKw,
+                prompt='Select ' + self.prompt,
                 entitiesToPick=INSTANCES,
-                numberToPick=self._number,
+                numberToPick=self.numberToPick,
                 sequenceStyle=TUPLE)    # TUPLE or ARRAY
-
-    def getFirstStep(self):
         return self.step1
 
     def getLoopStep(self):
-        if MANY == self._number:
+        if MANY == self.numberToPick:
             return self.step1  # loop until canceled
 
 
@@ -163,12 +166,12 @@ toolset.registerKernelMenuButton(
         )
 
 class InstanceDuplicatePicked(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances to search for common parts'
+        method = 'instance_derefDup'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Pick Duplicate Parts...',
-        object=InstanceDuplicatePicked(toolset, 'instances to search for common parts', 'instance_derefDup'),
+        object=InstanceDuplicatePicked(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=__version__,
@@ -243,12 +246,12 @@ menu.pop()
 menu.append('&Suppress')
 
 class InstanceSuppressPicked(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances to suppress'
+        method = 'instance_suppress'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Picked Instances...',
-        object=InstanceSuppressPicked(toolset, 'instances to suppress', 'instance_suppress'),
+        object=InstanceSuppressPicked(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=__version__,
@@ -258,12 +261,12 @@ toolset.registerGuiMenuButton(
         )
 
 class InstanceSuppressPart(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances of parts to suppress'
+        method = 'instance_suppress_part'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|All Instances of &Part...',
-        object=InstanceSuppressPart(toolset, 'parts to suppress', 'instance_suppress_part'),
+        object=InstanceSuppressPart(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=__version__,
@@ -319,12 +322,12 @@ menu.pop()
 menu.append('&Hide')
 
 class InstanceHidePicked(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances to hide'
+        method = 'instance_hide'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Picked Instances...',
-        object=InstanceHidePicked(toolset, 'instances to hide', 'instance_hide'),
+        object=InstanceHidePicked(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=__version__,
@@ -335,12 +338,12 @@ toolset.registerGuiMenuButton(
         )
 
 class InstanceHidePart(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instances of parts to hide'
+        method = 'instance_hide_part'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|All Instances of &Part...',
-        object=InstanceHidePart(toolset, 'parts to hide', 'instance_hide_part'),
+        object=InstanceHidePart(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=__version__,
@@ -387,12 +390,12 @@ toolset.registerKernelMenuButton(
         description='Remove parts that are not referenced by any instances.')
 
 class InstanceEditPicked(InstanceSelectProcedure):
-    """CAE seems to register this class with the GuiMenuButton, not the instance of the class"""
-    pass
+        prompt = 'instance to edit part'
+        method ='part_edit'
 
 toolset.registerGuiMenuButton(
         buttonText='|'.join(menu) + '|&Edit Picked...',
-        object=InstanceEditPicked(toolset, 'instance to edit part', 'part_edit', ONE),
+        object=InstanceEditPicked(toolset),
         kernelInitString='import assemblyMod',
         author='Carl Osterwisch',
         version=__version__,
